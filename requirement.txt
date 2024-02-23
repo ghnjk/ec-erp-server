@@ -1,0 +1,8 @@
+pyyaml==6.0
+Jinja2==3.0.3
+jinja2schema==0.1.4
+requests
+PyMySQL
+SQLAlchemy==1.4.51
+pandas
+flask
