@@ -472,8 +472,9 @@ class MysqlBackend(object):
     def search_suppliers(self, offset: int, limit: int) -> typing.Tuple[int, typing.List[SupplierDto]]:
         session = self.DBSession()
         q = session.query(SupplierDto).filter(SupplierDto.project_id == self.project_id).order_by(
-            SupplierDto.supplier_id.asc()).offset(offset).limit(limit)
+            SupplierDto.supplier_id.asc())
         total = q.count()
+        q = q.offset(offset).limit(limit)
         records = q.all()
         session.close()
         return total, records
@@ -523,9 +524,9 @@ class MysqlBackend(object):
             q = q.filter(SkuDto.sku_name.like(f"%{sku_name}%"))
         if sku is not None:
             q = q.filter(SkuDto.sku.like(f"%{sku}%"))
+        total = q.count()
         q = q.order_by(
             SkuDto.sku.asc()).offset(offset).limit(limit)
-        total = q.count()
         records = q.all()
         session.close()
         return total, records
@@ -574,8 +575,9 @@ class MysqlBackend(object):
     def search_sku_purchase_price(self, offset, limit) -> typing.Tuple[int, typing.List[SkuPurchasePriceDto]]:
         session = self.DBSession()
         q = session.query(SkuPurchasePriceDto).filter(SkuPurchasePriceDto.project_id == self.project_id).order_by(
-            SkuPurchasePriceDto.sku.asc()).offset(offset).limit(limit)
+            SkuPurchasePriceDto.sku.asc())
         total = q.count()
+        q = q.offset(offset).limit(limit)
         records = q.all()
         session.close()
         return total, records
@@ -626,8 +628,9 @@ class MysqlBackend(object):
     def search_purchase_order(self, offset, limit) -> typing.Tuple[int, typing.List[PurchaseOrder]]:
         session = self.DBSession()
         q = session.query(PurchaseOrder).filter(PurchaseOrder.project_id == self.project_id).order_by(
-            PurchaseOrder.purchase_order_id.desc()).offset(offset).limit(limit)
+            PurchaseOrder.purchase_order_id.desc())
         total = q.count()
+        q = q.offset(offset).limit(limit)
         records = q.all()
         session.close()
         return total, records
