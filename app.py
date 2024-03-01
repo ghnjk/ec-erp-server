@@ -14,8 +14,11 @@ app_config = get_app_config()
 
 def create_app():
     from ec_erp_api.apis.system import system_apis
-    app = Flask(app_config["application"])
+    from ec_erp_api.apis.supplier import supplier_apis
+    app = Flask(app_config["application"], static_url_path='')
+    app.static_folder = "./static"
     app.register_blueprint(system_apis, url_prefix="/erp_api/system")
+    app.register_blueprint(supplier_apis, url_prefix="/erp_api/supplier")
     return app
 
 

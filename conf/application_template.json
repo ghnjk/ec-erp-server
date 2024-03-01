@@ -1,0 +1,11 @@
+{
+  "application": "ec-erp",
+  "listen_port": 15002,
+  "session_secret_key": "xxxx",
+    "db_config": {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "user": "db_xxx",
+    "password": "db_xxx"
+  }
+}
