@@ -194,7 +194,8 @@ def sync_stock_to_erp(order: PurchaseOrder):
     from ec_erp_api.app_config import get_app_config
     from ec.bigseller.big_seller_client import BigSellerClient
     config = get_app_config()
-    client = BigSellerClient(config["ydm_token"], cookies_file_path="../cookies/big_seller.cookies")
+    cookies_dir = config.get("cookies_dir", "../cookies")
+    client = BigSellerClient(config["ydm_token"], cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))
     client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
     sync_id = f"IN-EC-{order.purchase_order_id}"
     stock_list = []
