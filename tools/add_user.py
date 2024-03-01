@@ -6,14 +6,15 @@
 @create: 2024/3/1
 """
 import sys
+import pandas as pd
 
 sys.path.append("..")
-from ec_erp_api.models.mysql_backend import MysqlBackend, UserDto
+from ec_erp_api.models.mysql_backend import MysqlBackend, UserDto, SupplierDto
 from ec_erp_api.app_config import get_app_config
 from ec_erp_api.common import codec_util
 
 
-def init_db():
+def add_user():
     config = get_app_config()
     db_config = config["db_config"]
     backend = MysqlBackend(
@@ -43,4 +44,4 @@ def init_db():
 
 
 if __name__ == '__main__':
-    init_db()
+    add_user()

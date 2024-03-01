@@ -154,6 +154,12 @@ class BigSellerClient:
         return res["data"]
 
     def query_sku_detail(self, sku_id: int, is_group: int = 0):
+        """
+
+        :param sku_id:
+        :param is_group:
+        :return:
+        """
         url = f"{self.query_sku_detail_url}?isGroup={is_group}&skuId={sku_id}"
         res = self.session.get(url).json()
         self.save_cookies()
