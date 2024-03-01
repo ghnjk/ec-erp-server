@@ -201,6 +201,7 @@ def sync_stock_to_erp(order: PurchaseOrder):
     stock_list = []
     for item in order.store_skus:
         sku = item["sku"]
+        print(f"sync_stock_to_erp add sku {sku}")
         sku_info = request_context.get_backend().get_sku(sku)
         stock_list.append({
             "skuId": int(sku_info.erp_sku_id),
