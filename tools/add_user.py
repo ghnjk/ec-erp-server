@@ -6,6 +6,8 @@
 @create: 2024/3/1
 """
 import sys
+
+sys.path.append("..")
 from ec_erp_api.models.mysql_backend import MysqlBackend, UserDto
 from ec_erp_api.app_config import get_app_config
 from ec_erp_api.common import codec_util

@@ -26,7 +26,7 @@ def main():
     app.secret_key = app_config["session_secret_key"]
     listen_ip = app_config.get("listen_host", "127.0.0.1")
     listen_port = app_config["listen_port"]
-    app.run(host=listen_ip, port=listen_port)
+    app.run(debug=True, host=listen_ip, port=listen_port)
 
 
 if __name__ == '__main__':
