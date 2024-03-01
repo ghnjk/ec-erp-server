@@ -6,6 +6,7 @@
 @create: 2024/3/1
 """
 import sys
+import time
 
 import pandas as pd
 
@@ -34,6 +35,7 @@ def import_sku():
         sku_group = row["SKU分组"]
         sku_name = row["产品名称"]
         sku = row["SKU"]
+        print(f"sync sku {sku}")
         sku_info = client.query_sku_detail(
             sm.get_sku_id_by_sku_name(sku)
         )
@@ -52,6 +54,7 @@ def import_sku():
             erp_sku_info=sku_info
         )
         backend.store_sku(s)
+        time.sleep(1)
 
 
 if __name__ == '__main__':

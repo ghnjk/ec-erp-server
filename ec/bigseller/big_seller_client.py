@@ -163,6 +163,10 @@ class BigSellerClient:
         url = f"{self.query_sku_detail_url}?isGroup={is_group}&skuId={sku_id}"
         res = self.session.get(url).json()
         self.save_cookies()
+        if res["code"] != 0:
+            print(f"query_sku_detail sku id {sku_id} failed.")
+            print(json.dumps(res, indent=2))
+            raise Exception(f"query_sku_detail sku id {sku_id} failed.")
         return res["data"]["detail"]
 
     def add_stock_to_erp(self, req):
