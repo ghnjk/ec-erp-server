@@ -27,18 +27,18 @@ def import_suppliers():
         supplier_name = row["商家"]
         wxchat = row["商家微信号"]
         notes = row["备注"]
-        sp = backend.store_supplier(SupplierDto(
+        sp = SupplierDto(
             supplier_id=-1,
             project_id="philipine",
             supplier_name=supplier_name,
             wechat_account=wxchat,
             detail=notes
-        ))
+        )
         for item in all_sp:
             if item.supplier_name == supplier_name:
                 sp.supplier_id = item.supplier_id
         backend.store_supplier(sp)
-        
+
 
 if __name__ == '__main__':
     import_suppliers()
