@@ -103,10 +103,47 @@ def save_sku():
         erp_sku_name=sku_info["title"],
         erp_sku_image_url=sku_info["imgUrl"],
         erp_sku_id=str(sku_info["id"]),
-        erp_sku_info=sku_info
+        erp_sku_info={}
     )
     request_context.get_backend().store_sku(s)
     return response_util.pack_response(DtoUtil.to_dict(s))
+
+
+@supplier_apis.route('/sync_all_sku', methods=["POST"])
+def sync_all_sku():
+    backend = request_context.get_backend()
+    _, sku_list = backend.search_sku(sku_group=None, sku_name=None, sku=None, offset=0, limit=10000)
+    config = get_app_config()
+    cookies_dir = config.get("cookies_dir", "../cookies")
+    sm = SkuManager(local_db_path=os.path.join(cookies_dir, "all_sku.json"))
+    sm.load()
+    client = BigSellerClient(config["ydm_token"], cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))
+    client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+    has_load_all_sku = False
+    update_count = 0
+    for item in sku_list:
+        sku_id = sm.get_sku_id(item.sku)
+        if sku_id is None and not has_load_all_sku:
+            sm = load_all_sku(client)
+            has_load_all_sku = True
+        sku_id = sm.get_sku_id(item.sku)
+        if sku_id is None:
+            continue
+        sku_info = client.query_sku_detail(
+            sku_id
+        )
+        inventory = 0
+        for vo in sku_info["warehouseVoList"]:
+            inventory += vo["available"]
+        item.inventory = inventory
+        item.erp_sku_name = sku_info["title"]
+        item.erp_sku_image_url = sku_info["imgUrl"]
+        item.erp_sku_id = str(sku_info["id"])
+        backend.store_sku(item)
+        update_count += 1
+    return response_util.pack_response({
+        "update_count": update_count
+    })
 
 
 @supplier_apis.route('/search_sku_purchase_price', methods=["POST"])
