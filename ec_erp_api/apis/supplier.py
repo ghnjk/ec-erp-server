@@ -106,6 +106,7 @@ def save_sku():
         erp_sku_info=sku_info
     )
     request_context.get_backend().store_sku(s)
+    return response_util.pack_response(DtoUtil.to_dict(s))
 
 
 @supplier_apis.route('/search_sku_purchase_price', methods=["POST"])
