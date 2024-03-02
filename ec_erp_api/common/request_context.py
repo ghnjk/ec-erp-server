@@ -42,7 +42,7 @@ def get_current_project_id() -> str:
 PMS_SUPPLIER = "supply"
 
 
-def validate_user_permission(permission_name: str):
+def validate_user_permission(permission_name: str) -> bool:
     """
     校验用户指定permission_name的权限
     :param permission_name:
@@ -50,16 +50,16 @@ def validate_user_permission(permission_name: str):
     """
     user_name = session.get("user_name")
     if user_name is None:
-        raise Exception("validate_user_permission failed: user not login.")
+        return False
     user = get_backend().get_user(user_name)
     if user.is_admin:
         # 管理员有所有的权限
-        return
+        return True
     project_id = session.get("project_id", "dev")
     for r in user.roles:
         if r["project_id"] != project_id:
             continue
         if r["name"] == permission_name:
             # 找到对应权限
-            return
-    raise Exception("权限不够。")
+            return True
+    return False

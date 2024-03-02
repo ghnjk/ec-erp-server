@@ -25,7 +25,8 @@ supplier_apis = Blueprint('supplier', __name__)
 
 @supplier_apis.route('/search_supplier', methods=["POST"])
 def search_supplier():
-    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
     current_page = request_util.get_int_param("current_page")
     page_size = request_util.get_int_param("page_size")
     offset = (current_page - 1) * page_size
@@ -37,7 +38,8 @@ def search_supplier():
 
 @supplier_apis.route('/search_sku', methods=["POST"])
 def search_sku():
-    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
     sku = request_util.get_str_param("sku")
     if sku is not None:
         sku = sku.strip()
@@ -76,7 +78,8 @@ def load_all_sku(client: BigSellerClient) -> SkuManager:
 
 @supplier_apis.route('/save_sku', methods=["POST"])
 def save_sku():
-    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
     config = get_app_config()
     cookies_dir = config.get("cookies_dir", "../cookies")
     sm = SkuManager(local_db_path=os.path.join(cookies_dir, "all_sku.json"))
@@ -115,7 +118,8 @@ def save_sku():
 
 @supplier_apis.route('/sync_all_sku', methods=["POST"])
 def sync_all_sku():
-    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
     backend = request_context.get_backend()
     _, sku_list = backend.search_sku(sku_group=None, sku_name=None, sku=None, offset=0, limit=10000)
     config = get_app_config()
@@ -154,7 +158,8 @@ def sync_all_sku():
 
 @supplier_apis.route('/search_sku_purchase_price', methods=["POST"])
 def search_sku_purchase_price():
-    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
     current_page = request_util.get_int_param("current_page")
     page_size = request_util.get_int_param("page_size")
     offset = (current_page - 1) * page_size
@@ -166,7 +171,8 @@ def search_sku_purchase_price():
 
 @supplier_apis.route('/search_purchase_order', methods=["POST"])
 def search_purchase_order():
-    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
     current_page = request_util.get_int_param("current_page")
     page_size = request_util.get_int_param("page_size")
     offset = (current_page - 1) * page_size
@@ -178,7 +184,8 @@ def search_purchase_order():
 
 @supplier_apis.route('/query_sku_purchase_price', methods=["POST"])
 def query_sku_purchase_price():
-    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
     supplier_id = request_util.get_int_param("supplier_id")
     sku = request_util.get_str_param("sku")
     price = request_context.get_backend().get_sku_purchase_price(supplier_id, sku)
@@ -251,7 +258,8 @@ def build_purchase_order_from_req() -> PurchaseOrder:
 
 @supplier_apis.route('/save_purchase_order', methods=["POST"])
 def save_purchase_order():
-    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
     order = build_purchase_order_from_req()
     request_context.get_backend().store_purchase_order(order)
     return response_util.pack_response({})
@@ -344,7 +352,8 @@ def submit_purchase_order_and_next_step():
     完成
     :return:
     """
-    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
     order = build_purchase_order_from_req()
     if order.purchase_step == "草稿":
         order.purchase_skus = remove_empty_sku(order.purchase_skus)
