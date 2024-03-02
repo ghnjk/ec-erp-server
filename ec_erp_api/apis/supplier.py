@@ -8,6 +8,8 @@
 import copy
 import datetime
 import os
+import time
+
 from ec_erp_api.common import request_util, response_util, request_context
 from flask import (
     Blueprint, session
@@ -141,6 +143,7 @@ def sync_all_sku():
         item.erp_sku_id = str(sku_info["id"])
         backend.store_sku(item)
         update_count += 1
+        time.sleep(0.3)
     return response_util.pack_response({
         "update_count": update_count
     })
