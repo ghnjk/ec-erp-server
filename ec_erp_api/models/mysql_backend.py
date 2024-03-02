@@ -77,6 +77,22 @@ class UserDto(DtoBase):
     user_name: Mapped[str] = Column('Fuser_name', String(128), primary_key=True, comment='用户名')
     default_project_id: Mapped[str] = Column('Fdefault_project_id', String(128), comment='默认项目')
     password: Mapped[str] = Column('Fpassword', String(256), comment='用户密码')
+    """
+        [
+            {
+                "project_id": "philipine",
+                "name": "supply",
+                "memo": "供应链管理",
+                "level": 1
+            },
+            {
+                "project_id": "philipine",
+                "name": "storehouse",
+                "memo": "仓库管理",
+                "level": 1
+            }
+        ]
+    """
     roles: Mapped[list] = Column('Froles', JSON, comment='用户角色列表')
     is_admin: Mapped[int] = Column('Fis_admin', Integer, default=0, server_default="0",
                                    comment='是否管理员, 1: 管理员')

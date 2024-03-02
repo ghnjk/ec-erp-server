@@ -12,11 +12,10 @@ import time
 
 from ec_erp_api.common import request_util, response_util, request_context
 from flask import (
-    Blueprint, session
+    Blueprint
 )
 from ec_erp_api.app_config import get_app_config
 from ec.bigseller.big_seller_client import BigSellerClient
-from ec_erp_api.common import codec_util
 from ec.sku_manager import SkuManager
 from ec_erp_api.models.mysql_backend import PurchaseOrder, SkuDto, SkuPurchasePriceDto, DtoUtil
 import json
@@ -26,6 +25,7 @@ supplier_apis = Blueprint('supplier', __name__)
 
 @supplier_apis.route('/search_supplier', methods=["POST"])
 def search_supplier():
+    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
     current_page = request_util.get_int_param("current_page")
     page_size = request_util.get_int_param("page_size")
     offset = (current_page - 1) * page_size
@@ -37,6 +37,7 @@ def search_supplier():
 
 @supplier_apis.route('/search_sku', methods=["POST"])
 def search_sku():
+    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
     sku = request_util.get_str_param("sku")
     if sku is not None:
         sku = sku.strip()
@@ -75,6 +76,7 @@ def load_all_sku(client: BigSellerClient) -> SkuManager:
 
 @supplier_apis.route('/save_sku', methods=["POST"])
 def save_sku():
+    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
     config = get_app_config()
     cookies_dir = config.get("cookies_dir", "../cookies")
     sm = SkuManager(local_db_path=os.path.join(cookies_dir, "all_sku.json"))
@@ -113,6 +115,7 @@ def save_sku():
 
 @supplier_apis.route('/sync_all_sku', methods=["POST"])
 def sync_all_sku():
+    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
     backend = request_context.get_backend()
     _, sku_list = backend.search_sku(sku_group=None, sku_name=None, sku=None, offset=0, limit=10000)
     config = get_app_config()
@@ -151,6 +154,7 @@ def sync_all_sku():
 
 @supplier_apis.route('/search_sku_purchase_price', methods=["POST"])
 def search_sku_purchase_price():
+    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
     current_page = request_util.get_int_param("current_page")
     page_size = request_util.get_int_param("page_size")
     offset = (current_page - 1) * page_size
@@ -162,6 +166,7 @@ def search_sku_purchase_price():
 
 @supplier_apis.route('/search_purchase_order', methods=["POST"])
 def search_purchase_order():
+    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
     current_page = request_util.get_int_param("current_page")
     page_size = request_util.get_int_param("page_size")
     offset = (current_page - 1) * page_size
@@ -173,6 +178,7 @@ def search_purchase_order():
 
 @supplier_apis.route('/query_sku_purchase_price', methods=["POST"])
 def query_sku_purchase_price():
+    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
     supplier_id = request_util.get_int_param("supplier_id")
     sku = request_util.get_str_param("sku")
     price = request_context.get_backend().get_sku_purchase_price(supplier_id, sku)
@@ -245,6 +251,7 @@ def build_purchase_order_from_req() -> PurchaseOrder:
 
 @supplier_apis.route('/save_purchase_order', methods=["POST"])
 def save_purchase_order():
+    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
     order = build_purchase_order_from_req()
     request_context.get_backend().store_purchase_order(order)
     return response_util.pack_response({})
@@ -265,6 +272,7 @@ def save_purchase_price(order: PurchaseOrder):
     :param order:
     :return:
     """
+    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
     for item in order.purchase_skus:
         sku = item["sku"]
         sku_info = request_context.get_backend().get_sku(sku)
@@ -336,6 +344,7 @@ def submit_purchase_order_and_next_step():
     完成
     :return:
     """
+    request_context.validate_user_permission(request_context.PMS_SUPPLIER)
     order = build_purchase_order_from_req()
     if order.purchase_step == "草稿":
         order.purchase_skus = remove_empty_sku(order.purchase_skus)
