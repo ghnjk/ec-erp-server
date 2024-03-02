@@ -12,8 +12,11 @@ from ec_erp_api.common import request_util, response_util, request_context
 from flask import (
     Blueprint, session
 )
+from ec_erp_api.app_config import get_app_config
+from ec.bigseller.big_seller_client import BigSellerClient
 from ec_erp_api.common import codec_util
-from ec_erp_api.models.mysql_backend import PurchaseOrder, SkuPurchasePriceDto, DtoUtil
+from ec.sku_manager import SkuManager
+from ec_erp_api.models.mysql_backend import PurchaseOrder, SkuDto, SkuPurchasePriceDto, DtoUtil
 import json
 
 supplier_apis = Blueprint('supplier', __name__)
@@ -56,6 +59,53 @@ def search_sku():
         sku_group, sku_name, sku,
         offset, page_size)
     return response_util.pack_pagination_result(total, records)
+
+
+def load_all_sku(client: BigSellerClient) -> SkuManager:
+    config = get_app_config()
+    cookies_dir = config.get("cookies_dir", "../cookies")
+    sm = SkuManager(local_db_path=os.path.join(cookies_dir, "all_sku.json"))
+    for row in client.load_all_sku():
+        sm.add(row)
+    sm.dump()
+    return sm
+
+
+@supplier_apis.route('/save_sku', methods=["POST"])
+def save_sku():
+    config = get_app_config()
+    cookies_dir = config.get("cookies_dir", "../cookies")
+    sm = SkuManager(local_db_path=os.path.join(cookies_dir, "all_sku.json"))
+    sm.load()
+    client = BigSellerClient(config["ydm_token"], cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))
+    client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+    sku = request_util.get_str_param("sku")
+    sku_group = request_util.get_str_param("sku_group")
+    sku_name = request_util.get_str_param("sku_name")
+    sku_id = sm.get_sku_id(sku)
+    if sku_id is None:
+        sm = load_all_sku(client)
+    sku_id = sm.get_sku_id(sku)
+    if sku_id is None:
+        return response_util.pack_error_response(1003, f"sku {sku} 不存在")
+    sku_info = client.query_sku_detail(
+        sku_id
+    )
+    inventory = 0
+    for vo in sku_info["warehouseVoList"]:
+        inventory += vo["available"]
+    s = SkuDto(
+        project_id=request_context.get_current_project_id(),
+        sku=sku,
+        sku_group=sku_group,
+        sku_name=sku_name,
+        inventory=inventory,
+        erp_sku_name=sku_info["title"],
+        erp_sku_image_url=sku_info["imgUrl"],
+        erp_sku_id=str(sku_info["id"]),
+        erp_sku_info=sku_info
+    )
+    request_context.get_backend().store_sku(s)
 
 
 @supplier_apis.route('/search_sku_purchase_price', methods=["POST"])
@@ -191,8 +241,6 @@ def save_purchase_price(order: PurchaseOrder):
 
 
 def sync_stock_to_erp(order: PurchaseOrder):
-    from ec_erp_api.app_config import get_app_config
-    from ec.bigseller.big_seller_client import BigSellerClient
     config = get_app_config()
     cookies_dir = config.get("cookies_dir", "../cookies")
     client = BigSellerClient(config["ydm_token"], cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))

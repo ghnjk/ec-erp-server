@@ -30,7 +30,7 @@ class SkuManager(object):
         with open(self.local_db_path, "r") as fp:
             self.sku_map = json.load(fp)
 
-    def get_sku_id_by_sku_name(self, sku_name: str) -> typing.Optional[int]:
+    def get_sku_id(self, sku_name: str) -> typing.Optional[int]:
         item = self.sku_map.get(sku_name)
         if item is None:
             return None

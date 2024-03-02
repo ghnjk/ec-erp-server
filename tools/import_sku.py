@@ -37,7 +37,7 @@ def import_sku():
         sku = row["SKU"]
         print(f"sync sku {sku}")
         sku_info = client.query_sku_detail(
-            sm.get_sku_id_by_sku_name(sku)
+            sm.get_sku_id(sku)
         )
         inventory = 0
         for vo in sku_info["warehouseVoList"]:
