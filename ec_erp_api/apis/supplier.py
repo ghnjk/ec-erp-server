@@ -89,6 +89,10 @@ def save_sku():
     sku = request_util.get_str_param("sku")
     sku_group = request_util.get_str_param("sku_group")
     sku_name = request_util.get_str_param("sku_name")
+    sku_unit_name = request_util.get_str_param("sku_unit_name")
+    sku_unit_quantity = request_util.get_int_param("sku_unit_quantity")
+    avg_sell_quantity = request_util.get_int_param("avg_sell_quantity")
+    shipping_stock_quantity = request_util.get_int_param("shipping_stock_quantity")
     sku_id = sm.get_sku_id(sku)
     if sku_id is None:
         sm = load_all_sku(client)
@@ -110,7 +114,11 @@ def save_sku():
         erp_sku_name=sku_info["title"],
         erp_sku_image_url=sku_info["imgUrl"],
         erp_sku_id=str(sku_info["id"]),
-        erp_sku_info={}
+        erp_sku_info={},
+        sku_unit_name=sku_unit_name,
+        sku_unit_quantity=sku_unit_quantity,
+        avg_sell_quantity=avg_sell_quantity,
+        shipping_stock_quantity=shipping_stock_quantity
     )
     request_context.get_backend().store_sku(s)
     return response_util.pack_response(DtoUtil.to_dict(s))
@@ -216,7 +224,11 @@ def build_purchase_order_from_req() -> PurchaseOrder:
             "sku_group": sku_info.sku_group,
             "sku_name": sku_info.sku_name,
             "unit_price": int(item["unit_price"]),
-            "quantity": int(item["quantity"])
+            "quantity": int(item["quantity"]),
+            "sku_unit_name": sku_info.sku_unit_name,
+            "sku_unit_quantity": sku_info.sku_unit_quantity,
+            "avg_sell_quantity": sku_info.avg_sell_quantity,
+            "shipping_stock_quantity": sku_info.shipping_stock_quantity
         })
         sku_amount += int(item["unit_price"]) * int(item["quantity"])
     store_skus = request_util.get_param("store_skus", [])
@@ -232,6 +244,10 @@ def build_purchase_order_from_req() -> PurchaseOrder:
             "sku_name": sku_info.sku_name,
             "unit_price": int(item["unit_price"]),
             "quantity": int(item["quantity"]),
+            "sku_unit_name": sku_info.sku_unit_name,
+            "sku_unit_quantity": sku_info.sku_unit_quantity,
+            "avg_sell_quantity": sku_info.avg_sell_quantity,
+            "shipping_stock_quantity": sku_info.shipping_stock_quantity,
             "check_in_quantity": int(item["check_in_quantity"])
         })
     order = PurchaseOrder(
@@ -315,7 +331,7 @@ def sync_stock_to_erp(order: PurchaseOrder):
                 {
                     "shelfId": "",
                     "shelfName": "",
-                    "stockQty": item["check_in_quantity"]
+                    "stockQty": item["check_in_quantity"] * item["sku_unit_quantity"]
                 }
             ]
         })

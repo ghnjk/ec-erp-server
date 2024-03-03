@@ -51,7 +51,11 @@ def import_sku():
             erp_sku_name=sku_info["title"],
             erp_sku_image_url=sku_info["imgUrl"],
             erp_sku_id=str(sku_info["id"]),
-            erp_sku_info=sku_info
+            erp_sku_info=sku_info,
+            sku_unit_name="",
+            sku_unit_quantity=1,
+            avg_sell_quantity=0,
+            shipping_stock_quantity=0
         )
         backend.store_sku(s)
         time.sleep(1)

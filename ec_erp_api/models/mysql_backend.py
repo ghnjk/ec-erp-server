@@ -157,8 +157,15 @@ class SkuDto(DtoBase):
     sku: Mapped[str] = Column('Fsku', String(256), comment='商品SKU')
     sku_group: Mapped[str] = Column('Fsku_group', String(256), index=True, comment='商品SKU分组')
     sku_name: Mapped[str] = Column('Fsku_name', String(1024), index=True, comment='商品名称')
+    sku_unit_name: Mapped[str] = Column('Fsku_unit_name', String(256), default="", server_default="", comment='采购单位')
+    sku_unit_quantity: Mapped[int] = Column('Fsku_unit_quantity', Integer, default=1, server_default="1",
+                                            comment='每个单位的sku数')
     inventory: Mapped[int] = Column('Finventory', Integer, default=0, server_default="0",
                                     comment='库存量')
+    avg_sell_quantity: Mapped[int] = Column('Favg_sell_quantity', Integer, default=0, server_default="0",
+                                            comment='平均每天销售量')
+    shipping_stock_quantity: Mapped[int] = Column('Fshipping_stock_quantity', Integer, default=0, server_default="0",
+                                                  comment='海运中的sku数')
     erp_sku_name: Mapped[str] = Column('Ferp_sku_name', String(1024), index=True, comment='ERP商品名称')
     erp_sku_image_url: Mapped[str] = Column('Ferp_sku_image_url', String(10240), comment='商品图片链接')
     erp_sku_id: Mapped[str] = Column('Ferp_sku_id', String(256), comment='erp上sku id')
@@ -177,6 +184,8 @@ class SkuDto(DtoBase):
         "project_id", "sku", "sku_group",
         "sku_name", "inventory", "erp_sku_name", "erp_sku_image_url",
         "erp_sku_id", "erp_sku_info",
+        "sku_unit_name", "sku_unit_quantity",
+        "avg_sell_quantity", "shipping_stock_quantity",
         "is_delete", "version",
         "modify_user", "create_time", "modify_time"
     ]
