@@ -7,6 +7,9 @@
 """
 import time
 import datetime
+import sys
+
+sys.path.append("..")
 from ec_erp_api.app_config import get_app_config
 from ec_erp_api.common.big_seller_util import build_big_seller_client, build_shop_manager
 from ec.shop_manager import ShopManager
@@ -41,7 +44,7 @@ def sync_shop_statics_to_es():
     es = Elasticsearch(config["es_hosts"], verify_certs=False, http_auth=(config["es_user"], config["es_passwd"]))
 
     now = time.time()
-    for i in range(40):
+    for i in range(1):
         ti = now - (i + 1) * 24 * 3600
         order_date = datetime.datetime.fromtimestamp(ti).strftime("%Y-%m-%d")
         print(f"sync_shop_statics_to_es {order_date} ...")

@@ -6,7 +6,9 @@
 @create: 2023/8/1
 """
 import time
+import sys
 
+sys.path.append("..")
 from ec_erp_api import app_config
 import datetime
 from ec.bigseller.big_seller_client import BigSellerClient

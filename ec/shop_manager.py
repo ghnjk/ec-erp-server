@@ -60,6 +60,7 @@ class ShopManager(object):
             shop_id = str(shop["id"])
             shop["shopOwner"] = shop_owner_map.get(shop_id, "UNKNOWN")
             self.shop_info[shop_id] = shop
+        self.dump()
 
     def dump(self):
         with open(self.shop_info_file, "w") as fp:
