@@ -56,5 +56,11 @@ def sync_shop_statics_to_es():
         time.sleep(0.1)
 
 
+def disable_urlib_warning():
+    import urllib3
+    urllib3.disable_warnings()
+
+
 if __name__ == '__main__':
+    disable_urlib_warning()
     sync_shop_statics_to_es()

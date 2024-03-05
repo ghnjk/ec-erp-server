@@ -15,11 +15,26 @@ class SkuManager(object):
         self.local_db_path = local_db_path
         # sku_map = dict[sku_name, sku_info]
         self.sku_map: dict = {}
+        # platform_sku_map = dict[shop_id # platform_sku, sku_name]
+        self.platform_sku_map: dict = {}
+        # sku_group_attr = dict[sku_name, {
+        #   is_group, sku_group_items
+        # }]
+        self.sku_group_attr: dict = {}
 
     def add(self, sku: dict):
         key = sku["sku"]
         if key in self.sku_map:
             raise f"conflict sku {key}"
+        for item in sku.get("skuRelations", []):
+            shop_id = item["shop"]["id"]
+            platform_sku = item["platformSku"]
+            pk = f"{shop_id}#{platform_sku}"
+            self.platform_sku_map[pk] = key
+        self.sku_group_attr[sku] = {
+            "is_group": sku.get("isGroup", 0),
+            "sku_group_items": sku.get("skuGroupVoList", [])
+        }
         self.sku_map[key] = sku
 
     def dump(self):
@@ -28,7 +43,9 @@ class SkuManager(object):
 
     def load(self):
         with open(self.local_db_path, "r") as fp:
-            self.sku_map = json.load(fp)
+            docs = json.load(fp)
+            for sku in docs:
+                self.add(docs[sku])
 
     def get_sku_id(self, sku_name: str) -> typing.Optional[int]:
         item = self.sku_map.get(sku_name)
