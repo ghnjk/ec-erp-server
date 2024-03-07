@@ -38,4 +38,5 @@ def build_sku_manager() -> SkuManager:
     sku_manager = SkuManager(
         os.path.join(cookies_dir, "all_sku.json")
     )
+    sku_manager.load()
     return sku_manager
