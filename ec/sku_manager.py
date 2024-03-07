@@ -52,12 +52,13 @@ class SkuManager(object):
             json.dump(self.sku_detail_variant, fp, indent=2, ensure_ascii=False)
 
     def load(self):
-        with open(self.all_variant_sku_db_path, "r") as fp:
-            self.sku_detail_variant = json.load(fp)
-        with open(self.local_db_path, "r") as fp:
-            docs = json.load(fp)
-            for sku in docs:
-                self.add(docs[sku])
+        if os.path.isfile(self.all_variant_sku_db_path) and os.path.isfile(self.all_variant_sku_db_path):
+            with open(self.all_variant_sku_db_path, "r") as fp:
+                self.sku_detail_variant = json.load(fp)
+            with open(self.local_db_path, "r") as fp:
+                docs = json.load(fp)
+                for sku in docs:
+                    self.add(docs[sku])
 
     def get_sku_id(self, sku_name: str) -> typing.Optional[int]:
         item = self.sku_map.get(sku_name)
