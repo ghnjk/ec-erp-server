@@ -93,7 +93,78 @@ class BigSellerClient:
     def load_all_sku(self):
         """
         查询所有的sku和匹配关系
-        :return:
+        :return:[
+            {
+                "id": 38793152,
+                "imgUrl": "https://bigseller-1251220924.cos.accelerate.myqcloud.com/album/279590/2024020609544240b650d0ca6e68ab265f7a5e01222b55.png?imageView2/1/w/300/h/300",
+                "sku": "SC-17-2m*1m",
+                "title": "2平米的防晒网",
+                "productCount": 1,
+                "mappingStatus": 1,
+                "skuRelations": [
+                  {
+                    "id": 115531298,
+                    "puid": 279590,
+                    "skuId": 38793152,
+                    "platform": "lazada",
+                    "shop": {
+                      "createTime": 1678092565000,
+                      "updateTime": 1705567752000,
+                      "id": 2100179,
+                      "puid": 279590,
+                      "name": "Green lawn (09204889221)",
+                      "status": 1,
+                      "authTime": 1705567752000,
+                      "platform": "lazada",
+                      "areaType": 1,
+                      "salesMarket": "PH",
+                      "vipShopNumType": 0,
+                      "socialMedia": 0,
+                      "isRun": 0,
+                      "commissionRatio": 10.0,
+                      "isCustom": 0,
+                      "site": null,
+                      "is3pf": null,
+                      "shopType": null,
+                      "cnsc": null
+                    },
+                    "platformSku": "SC-17-2m*1m."
+                  }
+                ],
+                "isGroup": 1,
+                "skuGroupVoList": [
+                  {
+                    "id": 32840,
+                    "skuId": 38793152,
+                    "varSkuId": 38793139,
+                    "varSku": "SC-17-2m*0.5m",
+                    "varSkuTitle": "17mm的最低尺寸",
+                    "varSkuImgUrl": "https://bigseller-1251220924.cos.accelerate.myqcloud.com/album/279590/202402060957272ed23312886b5c7d136f326e961efef8.jpg",
+                    "num": 2,
+                    "costAllocationRatio": 1.0,
+                    "commodityWeight": 0,
+                    "cost": null,
+                    "available": 0,
+                    "common": 0,
+                    "promotion": 0,
+                    "onhand": 0,
+                    "isOutOfStock": null
+                  }
+                ],
+                "commodityWeight": "0.00",
+                "commodityVolume": "0*0*0",
+                "merchantSkuId": "90001684",
+                "gtinCode": null,
+                "classifyName": "未分类",
+                "referencePrice": "0.0000",
+                "createTimeStr": "2024-02-06 17:59",
+                "updateTimeStr": "2024-02-06 17:59",
+                "saleStatus": 1,
+                "retailList": null,
+                "remark": null,
+                "remarkTimeStr": null
+              }
+        ]
         """
         rows = []
         page_size = 300

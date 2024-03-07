@@ -9,6 +9,7 @@ import os
 from ec_erp_api.app_config import get_app_config
 from ec.bigseller.big_seller_client import BigSellerClient
 from ec.shop_manager import ShopManager
+from ec.sku_manager import SkuManager
 
 __BIG_SELLER_CLIENT__ = None
 
@@ -29,3 +30,12 @@ def build_shop_manager() -> ShopManager:
     cookies_dir = config.get("cookies_dir", "../cookies")
     sm = ShopManager(shop_info_file=os.path.join(cookies_dir, "shop_group.json"))
     return sm
+
+
+def build_sku_manager() -> SkuManager:
+    config = get_app_config()
+    cookies_dir = config.get("cookies_dir", "../cookies")
+    sku_manager = SkuManager(
+        os.path.join(cookies_dir, "all_sku.json")
+    )
+    return sku_manager

@@ -307,6 +307,71 @@ class PurchaseOrder(DtoBase):
     ]
 
 
+class SkuSaleEstimateDto(DtoBase):
+    """
+    商品SKU销售数据
+    """
+    __tablename__ = "t_sku_sale_estimate"
+    __table_args__ = (PrimaryKeyConstraint(
+        "Fproject_id", "Forder_date", "Fsku", "Fshop_id"
+    ), {
+                          "mysql_default_charset": "utf8"
+                      })
+    project_id: Mapped[str] = Column('Fproject_id', String(128), comment='所属项目ID')
+    order_date: Mapped[datetime] = Column('Forder_date', DateTime, default=datetime.now(),
+                                          server_default=sql.func.now(), comment='订单日期')
+    sku: Mapped[str] = Column('Fsku', String(256), comment='商品SKU')
+    shop_id: Mapped[str] = Column('Fshop_id', String(256), comment='店铺id')
+    sku_class: Mapped[str] = Column('Fsku_class', String(256), index=True, comment='商品SKU大类')
+    sku_group: Mapped[str] = Column('Fsku_group', String(256), index=True, comment='商品SKU分组')
+    sku_name: Mapped[str] = Column('Fsku_name', String(1024), index=True, comment='商品名称')
+    shop_name: Mapped[str] = Column('Fshop_name', String(256), index=True, default="", server_default="", comment='店铺名')
+    shop_owner: Mapped[str] = Column('Fshop_owner', String(256), index=True, default="", server_default="",
+                                     comment='店铺运营人员')
+
+    sale_amount: Mapped[int] = Column('Fsale_amount', Integer, default=0, server_default="0",
+                                      comment='销售额')
+    sale_quantity: Mapped[int] = Column('Fsale_quantity', Integer, default=0, server_default="0",
+                                        comment='销售的sku量')
+    cancel_amount: Mapped[int] = Column('Fcancel_amount', Integer, default=0, server_default="0",
+                                        comment='取消的销售额')
+    cancel_quantity: Mapped[int] = Column('Fcancel_quantity', Integer, default=0, server_default="0",
+                                          comment='取消的sku量')
+    cancel_orders: Mapped[int] = Column('Fcancel_orders', Integer, default=0, server_default="0",
+                                        comment='取消的订单数')
+    refund_amount: Mapped[int] = Column('Frefund_amount', Integer, default=0, server_default="0",
+                                        comment='退款的销售额')
+    refund_quantity: Mapped[int] = Column('Frefund_quantity', Integer, default=0, server_default="0",
+                                          comment='退款的sku量')
+    refund_orders: Mapped[int] = Column('Frefund_orders', Integer, default=0, server_default="0",
+                                        comment='退款的订单数')
+    efficient_amount: Mapped[int] = Column('Fefficient_amount', Integer, default=0, server_default="0",
+                                           comment='有效销售额')
+    efficient_quantity: Mapped[int] = Column('Fefficient_quantity', Integer, default=0, server_default="0",
+                                             comment='有效的sku量')
+    efficient_orders: Mapped[int] = Column('Fefficient_orders', Integer, default=0, server_default="0",
+                                           comment='有效订单数')
+    is_delete: Mapped[int] = Column('Fis_delete', Integer, default=0, server_default="0",
+                                    comment='是否逻辑删除, 1: 删除')
+    version: Mapped[int] = Column('Fversion', Integer, default=0, server_default="0",
+                                  comment="记录版本号")
+    modify_user: Mapped[str] = Column('Fmodify_user', String(128), default="", server_default="",
+                                      comment="修改用户")
+    create_time: Mapped[datetime] = Column('Fcreate_time', DateTime, index=True, default=datetime.now(),
+                                           server_default=sql.func.now(), comment='创建时间')
+    modify_time: Mapped[datetime] = Column('Fmodify_time', DateTime, index=True, default=datetime.now(),
+                                           server_default=sql.func.now(), comment='修改时间')
+    columns = [
+        "project_id", "order_date", "sku", "shop_id",
+        "sku_class", "sku_group", "sku_name", "shop_name",
+        "shop_owner", "sale_amount", "sale_quantity", "cancel_amount", "cancel_quantity",
+        "refund_amount", "refund_quantity", "efficient_amount", "efficient_quantity",
+        "cancel_orders", "refund_orders", "efficient_orders",
+        "is_delete", "version",
+        "modify_user", "create_time", "modify_time"
+    ]
+
+
 class MysqlBackend(object):
     """
         状态后端接口
@@ -677,6 +742,53 @@ class MysqlBackend(object):
         price = self._get_sku_purchase_price(session, sku, supplier_id)
         session.close()
         return price
+
+    def _get_sku_sale_estimate(self, session, order_date, sku, shop_id) -> typing.Optional[SkuSaleEstimateDto]:
+        try:
+            record: SkuSaleEstimateDto = session.query(SkuSaleEstimateDto).filter(
+                SkuSaleEstimateDto.project_id == self.project_id
+            ).filter(
+                SkuSaleEstimateDto.order_date == order_date
+            ).filter(
+                SkuSaleEstimateDto.order_date == order_date
+            ).filter(
+                SkuSaleEstimateDto.sku == sku
+            ).filter(
+                SkuSaleEstimateDto.shop_id == shop_id
+            ).one()
+            return record
+        except NoResultFound:
+            return None
+
+    def store_sku_sale_estimate(self, est: SkuSaleEstimateDto):
+        if est.project_id != self.project_id:
+            raise Exception("sku project 非本项目数据")
+        session = self.DBSession()
+        try:
+            # 查询db是否有这个记录
+            db_dto = self._get_sku_sale_estimate(session,
+                                                 est.order_date, est.sku, est.shop_id)
+
+            # 备份记录
+            if db_dto is not None:
+                est.create_time = db_dto.create_time
+                DtoUtil.copy(est, db_dto)
+                db_dto.modify_time = datetime.now()
+                session.add(db_dto)
+            else:
+                # 构建新的dto
+                est.create_time = datetime.now()
+                est.modify_time = datetime.now()
+                session.add(est)
+            # 提交事务
+            session.commit()
+            session.close()
+        except Exception as e:
+            session.rollback()
+            session.close()
+            logging.error(f"store SkuSaleEstimateDto sku {est.sku} order_date {est.order_date} shop_id {est.shop_id} "
+                          f"  failed: {e}")
+            raise
 
 
 def main():

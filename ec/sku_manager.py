@@ -7,6 +7,7 @@
 """
 import json
 import typing
+from ec.bigseller.big_seller_client import BigSellerClient
 
 
 class SkuManager(object):
@@ -27,8 +28,8 @@ class SkuManager(object):
         if key in self.sku_map:
             raise f"conflict sku {key}"
         for item in sku.get("skuRelations", []):
-            shop_id = item["shop"]["id"]
-            platform_sku = item["platformSku"]
+            shop_id = str(item["shop"]["id"]).strip()
+            platform_sku = str(item["platformSku"]).strip()
             pk = f"{shop_id}#{platform_sku}"
             self.platform_sku_map[pk] = key
         self.sku_group_attr[sku] = {
@@ -52,3 +53,22 @@ class SkuManager(object):
         if item is None:
             return None
         return item["id"]
+
+    def get_sku_name_by_shop_sku(self, shop_id, sku) -> str:
+        shop_id = str(shop_id).strip()
+        sku = str(sku).strip()
+        pk = f"{shop_id}#{sku}"
+        return self.platform_sku_map.get(pk, "UNKNOWN")
+
+    def get_sku_group_attr(self, sku_name):
+        if sku_name in self.sku_group_attr:
+            return self.sku_group_attr[sku_name]
+        return {
+            "is_group": 0,
+            "sku_group_items": []
+        }
+
+    def load_and_update_all_sku(self, client: BigSellerClient):
+        self.sku_map = {}
+        for r in client.load_all_sku():
+            self.add(r)
