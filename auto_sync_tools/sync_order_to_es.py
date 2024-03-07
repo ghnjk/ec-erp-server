@@ -91,7 +91,7 @@ def sync_sku_orders_to_es(order_date: str):
                 r["sku"]
             )
         if sku_name == "UNKNOWN":
-            print("get_sku_name_by_shop_sku " + r["shopId"] + " sku: " + r["sku"] + " unknown.")
+            print("get_sku_name_by_shop_sku " + str(r["shopId"]) + " sku: " + r["sku"] + " unknown.")
         group_attr = sku_manager.get_sku_group_attr(sku_name)
         if group_attr.get("is_group", 0) == 0 or len(
                 group_attr.get("sku_group_items", [])
