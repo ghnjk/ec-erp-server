@@ -95,7 +95,7 @@ class SkuManager(object):
                 ] = r["skuRelations"]
                 self.sku_detail_variant[
                     r["sku"]
-                ].extends(
+                ].append(
                     client.get_more_sku_mapping(r["id"])
                 )
             else:
