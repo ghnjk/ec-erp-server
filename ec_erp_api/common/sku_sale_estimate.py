@@ -93,7 +93,7 @@ class SkuSaleEstimate(object):
         return sku_dict[shop_id]
 
     def _get_sku_from_db(self, sku: str) -> typing.Optional[SkuDto]:
-        if sku not in self.sku_dto_map:
+        if len(self.sku_dto_map.keys()) == 0:
             _, sku_list = self.backend.search_sku(sku_group=None, sku_name=None, sku=None, offset=0, limit=10000)
             for item in sku_list:
                 self.sku_dto_map[
