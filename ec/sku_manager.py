@@ -32,7 +32,7 @@ class SkuManager(object):
             platform_sku = str(item["platformSku"]).strip()
             pk = f"{shop_id}#{platform_sku}"
             self.platform_sku_map[pk] = key
-        self.sku_group_attr[sku] = {
+        self.sku_group_attr[key] = {
             "is_group": sku.get("isGroup", 0),
             "sku_group_items": sku.get("skuGroupVoList", [])
         }

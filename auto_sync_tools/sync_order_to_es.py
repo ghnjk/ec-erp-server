@@ -112,7 +112,7 @@ def sync_sku_orders_to_es(order_date: str):
 
 def main():
     now = time.time()
-    for i in range(1):
+    for i in range(1, 2):
         ti = now - (i + 1) * 24 * 3600
         date = datetime.datetime.fromtimestamp(ti).strftime("%Y-%m-%d")
         print(f"sync {date} ...")
