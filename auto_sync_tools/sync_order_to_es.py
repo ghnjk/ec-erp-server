@@ -58,18 +58,20 @@ def enrich_sku_info(doc: dict, sku_matcher: SkuGroupMatcher, shop_manager: ShopM
     doc["docId"] = doc_id
 
 
-def sync_sku_orders_to_es(order_date: str):
+has_reload_sku_manager = False
+
+
+def sync_sku_orders_to_es(order_date: str, sku_manager):
+    global has_reload_sku_manager
     conf = app_config.get_app_config()
     client = build_big_seller_client()
     shop_manager = build_shop_manager()
-    sku_manager = build_sku_manager()
     backend = build_backend("philipine")
     sku_estimate = SkuSaleEstimate(
         project_id="philipine",
         order_date=order_date,
         backend=backend
     )
-    has_reload_sku_manager = False
     sku_matcher = SkuGroupMatcher(app_config.get_config_file("product_label.txt"))
     es = Elasticsearch(conf["es_hosts"], verify_certs=False, http_auth=(conf["es_user"], conf["es_passwd"]))
 
@@ -117,12 +119,13 @@ def sync_sku_orders_to_es(order_date: str):
 
 
 def main():
+    sku_manager = build_sku_manager()
     now = time.time()
-    for i in range(1, 2):
+    for i in range(1, 30):
         ti = now - (i + 1) * 24 * 3600
         date = datetime.datetime.fromtimestamp(ti).strftime("%Y-%m-%d")
         print(f"sync {date} ...")
-        sync_sku_orders_to_es(date)
+        sync_sku_orders_to_es(date, sku_manager)
         time.sleep(0.1)
 
 

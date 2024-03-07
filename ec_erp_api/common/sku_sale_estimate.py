@@ -76,7 +76,7 @@ class SkuSaleEstimate(object):
                 sku_class=sale_doc["skuGroup"],
                 sku_group=sku_group,
                 sku_name=sku_name,
-                shop_name=sale_doc["shopOwner"],
+                shop_name=sale_doc["shopName"],
                 shop_owner=sale_doc["shopOwner"],
                 sale_amount=0,
                 sale_quantity=0,
