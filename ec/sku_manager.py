@@ -88,16 +88,19 @@ class SkuManager(object):
                     r["sku"]
                 ] = []
             elif r["productCount"] > len(r["skuRelations"]):
-                print(f"query more mapping for sku " + r["sku"] + " count " + str(r["productCount"]))
-                # 需要从后台拉取详细的sku映射关系
-                self.sku_detail_variant[
-                    r["sku"]
-                ] = r["skuRelations"]
-                self.sku_detail_variant[
-                    r["sku"]
-                ].extend(
-                    client.get_more_sku_mapping(r["id"])
-                )
+                if r["productCount"] > len(
+                        self.sku_detail_variant[r["sku"]]
+                ):
+                    print(f"query more mapping for sku " + r["sku"] + " count " + str(r["productCount"]))
+                    # 需要从后台拉取详细的sku映射关系
+                    self.sku_detail_variant[
+                        r["sku"]
+                    ] = r["skuRelations"]
+                    self.sku_detail_variant[
+                        r["sku"]
+                    ].extend(
+                        client.get_more_sku_mapping(r["id"])
+                    )
             else:
                 self.sku_detail_variant[
                     r["sku"]

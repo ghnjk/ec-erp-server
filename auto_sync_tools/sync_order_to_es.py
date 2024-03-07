@@ -94,7 +94,7 @@ def sync_sku_orders_to_es(order_date: str):
             print("get_sku_name_by_shop_sku " + str(r["shopId"]) + " sku: " + r["sku"] + " unknown.")
             import json
             print(json.dumps(r, indent=2, ensure_ascii=False))
-            exit(-1)
+            # exit(-1)
         group_attr = sku_manager.get_sku_group_attr(sku_name)
         if group_attr.get("is_group", 0) == 0 or len(
                 group_attr.get("sku_group_items", [])
