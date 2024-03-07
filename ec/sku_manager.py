@@ -83,7 +83,7 @@ class SkuManager(object):
     def load_and_update_all_sku(self, client: BigSellerClient):
         self.sku_map = {}
         for r in client.load_all_sku():
-            if r["productCount"] > 0 and r["productCount"] > len(r["skuRelations"]):
+            if r.get("productCount", 0) > 0 and r["productCount"] > len(r["skuRelations"]):
                 print(f"query more mapping for sku " + r["sku"] + " count " + str(r["productCount"]))
                 # 需要从后台拉取详细的sku映射关系
                 self.sku_detail_variant[
