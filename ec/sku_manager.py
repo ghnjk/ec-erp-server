@@ -5,6 +5,7 @@
 @author: jkguo
 @create: 2024/2/7
 """
+import os
 import json
 import typing
 from ec.bigseller.big_seller_client import BigSellerClient
@@ -14,8 +15,13 @@ class SkuManager(object):
 
     def __init__(self, local_db_path: str = "cookies/all_sku.json"):
         self.local_db_path = local_db_path
+        self.all_variant_sku_db_path = os.path.join(
+            os.path.dirname(self.local_db_path),
+            "all_variant_sku_mapping.json"
+        )
         # sku_map = dict[sku_name, sku_info]
         self.sku_map: dict = {}
+        self.sku_detail_variant = {}
         # platform_sku_map = dict[shop_id # platform_sku, sku_name]
         self.platform_sku_map: dict = {}
         # sku_group_attr = dict[sku_name, {
@@ -27,8 +33,8 @@ class SkuManager(object):
         key = sku["sku"]
         if key in self.sku_map:
             raise f"conflict sku {key}"
-        if sku.get("skuRelations", []) is not None:
-            for item in sku.get("skuRelations", []):
+        if self.sku_detail_variant[key] is not None:
+            for item in self.sku_detail_variant[key]:
                 shop_id = str(item["shop"]["id"]).strip()
                 platform_sku = str(item["platformSku"]).strip()
                 pk = f"{shop_id}#{platform_sku}"
@@ -42,8 +48,12 @@ class SkuManager(object):
     def dump(self):
         with open(self.local_db_path, "w") as fp:
             json.dump(self.sku_map, fp, indent=2, ensure_ascii=False)
+        with open(self.all_variant_sku_db_path, "w") as fp:
+            json.dump(self.sku_detail_variant, fp, indent=2, ensure_ascii=False)
 
     def load(self):
+        with open(self.all_variant_sku_db_path, "r") as fp:
+            self.sku_detail_variant = json.load(fp)
         with open(self.local_db_path, "r") as fp:
             docs = json.load(fp)
             for sku in docs:
@@ -72,4 +82,20 @@ class SkuManager(object):
     def load_and_update_all_sku(self, client: BigSellerClient):
         self.sku_map = {}
         for r in client.load_all_sku():
+            if r["productCount"] > 0 and r["productCount"] > len(r["skuRelations"]):
+                print(f"query more mapping for sku " + r["sku"] + " count " + str(r["productCount"]))
+                # 需要从后台拉取详细的sku映射关系
+                self.sku_detail_variant[
+                    r["sku"]
+                ] = r["skuRelations"]
+                self.sku_detail_variant[
+                    r["sku"]
+                ].extends(
+                    client.get_more_sku_mapping(r["id"])
+                )
+            else:
+                self.sku_detail_variant[
+                    r["sku"]
+                ] = r["skuRelations"]
             self.add(r)
+        self.dump()

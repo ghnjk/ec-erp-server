@@ -420,3 +420,46 @@ class BigSellerClient:
             print(json.dumps(res, indent=2))
             raise Exception(f"query_all_shop_info failed.")
         return res["data"]["allShops"]
+
+    def get_more_sku_mapping(self, sku_id: int):
+        """
+        返回额外的sku映射关系
+        :param sku_id:
+        :return: [
+            {
+                "id": 20064789,
+                "puid": 279590,
+                "skuId": 9300380,
+                "platform": "lazada",
+                "shop": {
+                    "createTime": 1648112054000,
+                    "updateTime": 1705567593000,
+                    "id": 1039262,
+                    "puid": 279590,
+                    "name": "DIMI (09298645333)",
+                    "status": 1,
+                    "authTime": 1705567593000,
+                    "platform": "lazada",
+                    "areaType": 1,
+                    "salesMarket": "PH",
+                    "vipShopNumType": 0,
+                    "socialMedia": 0,
+                    "isRun": 0,
+                    "commissionRatio": 10.0,
+                    "isCustom": 0,
+                    "site": null,
+                    "is3pf": null,
+                    "shopType": null,
+                    "marketPlaceEaseMode": null,
+                    "cnsc": null
+                },
+                "platformSku": "QQ-1...."
+            }]
+        """
+        url = f"https://www.bigseller.com/api/v1/inventory/merchant/getMoreSkuMapping.json?skuId={sku_id}"
+        res = self.session.get(url).json()
+        if res["code"] != 0:
+            print(f"query_all_shop_info failed.")
+            print(json.dumps(res, indent=2))
+            raise Exception(f"query_all_shop_info failed.")
+        return res["data"][str(sku_id)]
