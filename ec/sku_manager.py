@@ -27,11 +27,12 @@ class SkuManager(object):
         key = sku["sku"]
         if key in self.sku_map:
             raise f"conflict sku {key}"
-        for item in sku.get("skuRelations", []):
-            shop_id = str(item["shop"]["id"]).strip()
-            platform_sku = str(item["platformSku"]).strip()
-            pk = f"{shop_id}#{platform_sku}"
-            self.platform_sku_map[pk] = key
+        if sku.get("skuRelations", []) is not None:
+            for item in sku.get("skuRelations", []):
+                shop_id = str(item["shop"]["id"]).strip()
+                platform_sku = str(item["platformSku"]).strip()
+                pk = f"{shop_id}#{platform_sku}"
+                self.platform_sku_map[pk] = key
         self.sku_group_attr[key] = {
             "is_group": sku.get("isGroup", 0),
             "sku_group_items": sku.get("skuGroupVoList", [])
