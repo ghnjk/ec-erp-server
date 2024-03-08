@@ -7,6 +7,9 @@
 """
 import time
 import datetime
+import sys
+
+sys.path.append("..")
 from ec_erp_api.common.big_seller_util import build_big_seller_client, build_backend
 
 
