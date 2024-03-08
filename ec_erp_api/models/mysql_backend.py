@@ -626,9 +626,9 @@ class MysqlBackend(object):
             sort_key = sort_types["sortBy"]
             descending = sort_types["descending"]
             if descending:
-                sort_claus = f"{sort_key} DESC"
+                sort_claus = f"F{sort_key} DESC"
             else:
-                sort_claus = f"{sort_key} ASC"
+                sort_claus = f"F{sort_key} ASC"
             q = q.order_by(text(sort_claus))
         else:
             q = q.order_by(SkuDto.sku.asc())
