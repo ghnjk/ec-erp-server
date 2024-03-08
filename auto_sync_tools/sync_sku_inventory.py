@@ -17,7 +17,7 @@ def load_and_calc_sku_avg_sell_quantity(backend, sku: str) -> float:
     now = time.time()
     day_sec = 24 * 36000
     end_ti = now - 3 * day_sec
-    begin_ti = end_ti - 7 * day_sec
+    begin_ti = end_ti - 14 * day_sec
     begin_date = datetime.datetime.fromtimestamp(begin_ti)
     end_date = datetime.datetime.fromtimestamp(end_ti)
     all_sale_quantity = 0
@@ -25,8 +25,8 @@ def load_and_calc_sku_avg_sell_quantity(backend, sku: str) -> float:
         all_sale_quantity += item.efficient_quantity
     print(f"load_and_calc_sku_avg_sell_quantity sku {sku} begin_date {begin_date.strftime('%y-%m-%d')} "
           f"end_date {end_date.strftime('%y-%m-%d')} "
-          f"avg_sale_quantity: {all_sale_quantity / 7.0}")
-    return all_sale_quantity / 7.0
+          f"avg_sale_quantity: {all_sale_quantity / 14.0}")
+    return all_sale_quantity / 14.0
 
 
 def sync_sku_inventory():
