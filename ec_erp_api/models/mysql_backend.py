@@ -12,6 +12,7 @@ from datetime import datetime
 import sqlalchemy
 from sqlalchemy import create_engine, String, JSON, Integer, Float, DateTime, sql, Column, PrimaryKeyConstraint
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.sql import text
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
@@ -609,7 +610,8 @@ class MysqlBackend(object):
 
     def search_sku(self,
                    sku_group, sku_name, sku,
-                   offset: int, limit: int, inventory_support_days: int = 0) -> typing.Tuple[int, typing.List[SkuDto]]:
+                   offset: int, limit: int, inventory_support_days: int = 0,
+                   sort_types: typing.Optional[dict] = None) -> typing.Tuple[int, typing.List[SkuDto]]:
         session = self.DBSession()
         q = session.query(SkuDto).filter(SkuDto.project_id == self.project_id)
         if sku_group is not None:
@@ -619,10 +621,19 @@ class MysqlBackend(object):
         if sku is not None:
             q = q.filter(SkuDto.sku.like(f"%{sku}%"))
         if inventory_support_days > 0:
-            q = q.filter(SkuDto.inventory_support_days >= inventory_support_days)
+            q = q.filter(SkuDto.inventory_support_days <= inventory_support_days)
+        if sort_types is not None:
+            sort_key = sort_types["sortBy"]
+            descending = sort_types["descending"]
+            if descending:
+                sort_claus = f"{sort_key} DESC"
+            else:
+                sort_claus = f"{sort_key} ASC"
+            q = q.order_by(text(sort_claus))
+        else:
+            q = q.order_by(SkuDto.sku.asc())
         total = q.count()
-        q = q.order_by(
-            SkuDto.sku.asc()).offset(offset).limit(limit)
+        q = q.offset(offset).limit(limit)
         records = q.all()
         session.close()
         return total, records
