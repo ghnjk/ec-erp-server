@@ -13,7 +13,7 @@ from ec_erp_api.common.big_seller_util import build_big_seller_client, build_bac
 def load_and_calc_sku_avg_sell_quantity(backend, sku: str) -> float:
     now = time.time()
     day_sec = 24 * 36000
-    end_ti = now - 2 * day_sec
+    end_ti = now - 3 * day_sec
     begin_ti = end_ti - 7 * day_sec
     begin_date = datetime.datetime.fromtimestamp(begin_ti)
     end_date = datetime.datetime.fromtimestamp(end_ti)
