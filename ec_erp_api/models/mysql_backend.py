@@ -10,7 +10,7 @@ import typing
 from datetime import datetime
 
 import sqlalchemy
-from sqlalchemy import create_engine, String, JSON, Integer, DateTime, sql, Column, PrimaryKeyConstraint
+from sqlalchemy import create_engine, String, JSON, Integer, Float, DateTime, sql, Column, PrimaryKeyConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import sessionmaker
@@ -162,8 +162,10 @@ class SkuDto(DtoBase):
                                             comment='每个单位的sku数')
     inventory: Mapped[int] = Column('Finventory', Integer, default=0, server_default="0",
                                     comment='库存量')
-    avg_sell_quantity: Mapped[int] = Column('Favg_sell_quantity', Integer, default=0, server_default="0",
-                                            comment='平均每天销售量')
+    avg_sell_quantity: Mapped[float] = Column('Favg_sell_quantity', Float, default=0.0, server_default="0.0",
+                                              comment='平均每天销售量')
+    inventory_support_days: Mapped[int] = Column('Finventory_support_days', Integer, default=0, server_default="0",
+                                                 comment='库存支撑天数预估')
     shipping_stock_quantity: Mapped[int] = Column('Fshipping_stock_quantity', Integer, default=0, server_default="0",
                                                   comment='海运中的sku数')
     erp_sku_name: Mapped[str] = Column('Ferp_sku_name', String(1024), index=True, comment='ERP商品名称')
@@ -185,7 +187,7 @@ class SkuDto(DtoBase):
         "sku_name", "inventory", "erp_sku_name", "erp_sku_image_url",
         "erp_sku_id", "erp_sku_info",
         "sku_unit_name", "sku_unit_quantity",
-        "avg_sell_quantity", "shipping_stock_quantity",
+        "avg_sell_quantity", "shipping_stock_quantity", "inventory_support_days",
         "is_delete", "version",
         "modify_user", "create_time", "modify_time"
     ]
@@ -750,8 +752,6 @@ class MysqlBackend(object):
             ).filter(
                 SkuSaleEstimateDto.order_date == order_date
             ).filter(
-                SkuSaleEstimateDto.order_date == order_date
-            ).filter(
                 SkuSaleEstimateDto.sku == sku
             ).filter(
                 SkuSaleEstimateDto.shop_id == shop_id
@@ -789,6 +789,31 @@ class MysqlBackend(object):
             logging.error(f"store SkuSaleEstimateDto sku {est.sku} order_date {est.order_date} shop_id {est.shop_id} "
                           f"  failed: {e}")
             raise
+
+    def search_sku_sale_estimate(self, begin_date, end_date, sku) -> typing.List[SkuSaleEstimateDto]:
+        """
+        检索 [begin_date, end_date)中sku相关的销售记录
+        :param begin_date:
+        :param end_date:
+        :param sku:
+        :return:
+        """
+        session = self.DBSession()
+        try:
+            records: SkuSaleEstimateDto = session.query(SkuSaleEstimateDto).filter(
+                SkuSaleEstimateDto.project_id == self.project_id
+            ).filter(
+                SkuSaleEstimateDto.order_date >= begin_date
+            ).filter(
+                SkuSaleEstimateDto.order_date < end_date
+            ).filter(
+                SkuSaleEstimateDto.sku == sku
+            ).all()
+            session.close()
+            return records
+        except NoResultFound:
+            session.close()
+            return []
 
 
 def main():

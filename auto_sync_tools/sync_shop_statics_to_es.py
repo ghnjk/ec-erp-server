@@ -44,7 +44,7 @@ def sync_shop_statics_to_es():
     es = Elasticsearch(config["es_hosts"], verify_certs=False, http_auth=(config["es_user"], config["es_passwd"]))
 
     now = time.time()
-    for i in range(1):
+    for i in range(3):
         ti = now - (i + 1) * 24 * 3600
         order_date = datetime.datetime.fromtimestamp(ti).strftime("%Y-%m-%d")
         print(f"sync_shop_statics_to_es {order_date} ...")

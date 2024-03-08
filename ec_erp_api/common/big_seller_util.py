@@ -10,6 +10,7 @@ from ec_erp_api.app_config import get_app_config
 from ec.bigseller.big_seller_client import BigSellerClient
 from ec.shop_manager import ShopManager
 from ec.sku_manager import SkuManager
+from ec_erp_api.models.mysql_backend import MysqlBackend
 
 __BIG_SELLER_CLIENT__ = None
 
@@ -40,3 +41,12 @@ def build_sku_manager() -> SkuManager:
     )
     sku_manager.load()
     return sku_manager
+
+
+def build_backend(project_id: str):
+    config = get_app_config()
+    db_config = config["db_config"]
+    backend = MysqlBackend(
+        project_id, db_config["host"], db_config["port"], db_config["user"], db_config["password"]
+    )
+    return backend

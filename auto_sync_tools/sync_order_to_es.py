@@ -11,23 +11,12 @@ import sys
 sys.path.append("..")
 from ec_erp_api import app_config
 import datetime
-from ec.bigseller.big_seller_client import BigSellerClient
 from ec.sku_group_matcher import SkuGroupMatcher
 from ec.shop_manager import ShopManager
 from elasticsearch import Elasticsearch
-from ec_erp_api.common.big_seller_util import build_big_seller_client, build_shop_manager, build_sku_manager
+from ec_erp_api.common.big_seller_util import build_big_seller_client, build_backend, build_shop_manager, \
+    build_sku_manager
 from ec_erp_api.common.sku_sale_estimate import SkuSaleEstimate
-from ec_erp_api.models.mysql_backend import MysqlBackend
-from ec_erp_api.app_config import get_app_config
-
-
-def build_backend(project_id: str):
-    config = get_app_config()
-    db_config = config["db_config"]
-    backend = MysqlBackend(
-        project_id, db_config["host"], db_config["port"], db_config["user"], db_config["password"]
-    )
-    return backend
 
 
 def enrich_sku_info(doc: dict, sku_matcher: SkuGroupMatcher, shop_manager: ShopManager):
@@ -121,7 +110,7 @@ def sync_sku_orders_to_es(order_date: str, sku_manager):
 def main():
     sku_manager = build_sku_manager()
     now = time.time()
-    for i in range(1, 30):
+    for i in range(1, 3):
         ti = now - (i + 1) * 24 * 3600
         date = datetime.datetime.fromtimestamp(ti).strftime("%Y-%m-%d")
         print(f"sync {date} ...")
