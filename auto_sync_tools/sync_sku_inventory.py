@@ -49,6 +49,7 @@ def sync_sku_inventory():
         else:
             sku_info.inventory_support_days = sku_info.inventory / 0.01
         backend.store_sku(sku_info)
+        time.sleep(0.1)
 
 
 if __name__ == '__main__':
