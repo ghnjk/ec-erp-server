@@ -607,7 +607,9 @@ class MysqlBackend(object):
                           f"  failed: {e}")
             raise
 
-    def search_sku(self, sku_group, sku_name, sku, offset: int, limit: int) -> typing.Tuple[int, typing.List[SkuDto]]:
+    def search_sku(self,
+                   sku_group, sku_name, sku,
+                   offset: int, limit: int, inventory_support_days: int = 0) -> typing.Tuple[int, typing.List[SkuDto]]:
         session = self.DBSession()
         q = session.query(SkuDto).filter(SkuDto.project_id == self.project_id)
         if sku_group is not None:
@@ -616,6 +618,8 @@ class MysqlBackend(object):
             q = q.filter(SkuDto.sku_name.like(f"%{sku_name}%"))
         if sku is not None:
             q = q.filter(SkuDto.sku.like(f"%{sku}%"))
+        if inventory_support_days > 0:
+            q = q.filter(SkuDto.inventory_support_days >= inventory_support_days)
         total = q.count()
         q = q.order_by(
             SkuDto.sku.asc()).offset(offset).limit(limit)

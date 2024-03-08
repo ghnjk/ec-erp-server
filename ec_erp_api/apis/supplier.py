@@ -55,6 +55,7 @@ def search_sku():
         sku_name = sku_name.strip()
     if sku_name == "":
         sku_name = None
+    inventory_support_days = request_util.get_int_param("inventory_support_days", 0)
     current_page = request_util.get_int_param("current_page")
     page_size = request_util.get_int_param("page_size")
     offset = (current_page - 1) * page_size
@@ -62,7 +63,7 @@ def search_sku():
         offset = 0
     total, records = request_context.get_backend().search_sku(
         sku_group, sku_name, sku,
-        offset, page_size)
+        offset, page_size, inventory_support_days)
     return response_util.pack_pagination_result(total, records)
 
 
