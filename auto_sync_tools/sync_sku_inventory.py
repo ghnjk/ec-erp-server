@@ -15,7 +15,7 @@ from ec_erp_api.common.big_seller_util import build_big_seller_client, build_bac
 
 def load_and_calc_sku_avg_sell_quantity(backend, sku: str) -> float:
     now = time.time()
-    day_sec = 24 * 36000
+    day_sec = 24 * 3600
     end_ti = now - 3 * day_sec
     begin_ti = end_ti - 14 * day_sec
     begin_date = datetime.datetime.fromtimestamp(begin_ti)
@@ -23,8 +23,8 @@ def load_and_calc_sku_avg_sell_quantity(backend, sku: str) -> float:
     all_sale_quantity = 0
     for item in backend.search_sku_sale_estimate(begin_date, end_date, sku):
         all_sale_quantity += item.efficient_quantity
-    print(f"load_and_calc_sku_avg_sell_quantity sku {sku} begin_date {begin_date.strftime('%y-%m-%d')} "
-          f"end_date {end_date.strftime('%y-%m-%d')} "
+    print(f"load_and_calc_sku_avg_sell_quantity sku {sku} begin_date {begin_date.strftime('%Y-%m-%d')} "
+          f"end_date {end_date.strftime('%Y-%m-%d')} "
           f"avg_sale_quantity: {all_sale_quantity / 14.0}")
     return all_sale_quantity / 14.0
 
