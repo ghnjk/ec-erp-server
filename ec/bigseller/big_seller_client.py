@@ -621,7 +621,7 @@ class BigSellerClient:
         req = {
             "searchContent": tracking_no,
             "historyOrder": False,
-            "warehouseId": str(warehouse_id)
+            "warehouseId": str(warehouse_id),
             "zoneId": ""
         }
         res = self.session.get(url, req).json()
@@ -640,10 +640,10 @@ class BigSellerClient:
         """
         url = "https://www.bigseller.com/api/v1/order/refund/before/returnWarehousing.json"
         req = {
-          "warehouseId": warehouse_id,
-          "opType": 1,
-          "isScan": 1,
-          "orderInfoList": refund_order
+            "warehouseId": warehouse_id,
+            "opType": 1,
+            "isScan": 1,
+            "orderInfoList": refund_order
         }
         res = self.session.post(url, json=req).json()
         self.save_cookies()
