@@ -8,6 +8,8 @@
 import json
 import os
 import time
+import typing
+
 import requests
 from ec.verifycode.ydm_verify import YdmVerify
 
@@ -463,3 +465,188 @@ class BigSellerClient:
             print(json.dumps(res, indent=2))
             raise Exception(f"query_all_shop_info failed.")
         return res["data"][str(sku_id)]
+
+    def query_not_op_refund_order_tracking_no_list(self, refund_date: str) -> typing.List[str]:
+        """
+        查询所有已退回待处理订单的运单号列表
+        :param refund_date:
+        :return:
+        """
+        tracking_no_list = []
+        page_size = 50
+        page_no = 1
+        while True:
+            req = {
+                "pageSize": page_size,
+                "pageNo": page_no,
+                "beginDate": None,
+                "endDate": None,
+                "isProcessed": None,
+                "returnStatus": 1,
+                "processingStatus": "",
+                "marketplaceStatus": None,
+                "expireDays": None,
+                "searchType": "orderNo",
+                "searchContent": "",
+                "shopId": "",
+                "shopGroup": "",
+                "showShopArr": False,
+                "shippingCarrier": None,
+                "paymentMethod": None,
+                "orderBy": "OrderedTime",
+                "historyOrder": False,
+                "desc": False,
+                "platform": "",
+                "days": None,
+                "daysType": None,
+                "orderDays": None,
+                "beginOrderDate": None,
+                "endOrderDate": None,
+                "warehouseId": None,
+                "type": None,
+                "returnDays": None,
+                "requestType": None,
+                "beginReturnDate": refund_date,
+                "endReturnDate": refund_date
+            }
+            res = self.session.post("https://www.bigseller.com/api/v1/order/refund/before/pageList.json",
+                                    json=req).json()
+            total_page = res["data"]["totalPage"]
+            total_size = res["data"]["totalSize"]
+            print(f"load page {page_no}/{total_page} data")
+            for r in res["data"]["rows"]:
+                tracking_no_list.append(
+                    r["trackingNo"]
+                )
+            if total_page <= page_no:
+                print(f"load all {total_size} refund orders")
+                break
+            page_no += 1
+        self.save_cookies()
+        return tracking_no_list
+
+    def query_refund_order_info_by_tracking_no(self, tracking_no: str, warehouse_id: int):
+        """
+        根据运单号查询退单详细信息
+        :param tracking_no:
+        :param warehouse_id:
+        :return: {
+            "orderId": 3660987642,
+            "reverseId": null,
+            "packageNo": "BS8H16200105",
+            "platformOrderId": "805023393560144",
+            "platformReverseId": null,
+            "trackingNo": "MP0779253015",
+            "warehouseId": 27763,
+            "processingStatus": null,
+            "platform": "lazada",
+            "showSelected": false,
+            "error": null,
+            "simpleOrderList": null,
+            "itemList": [
+              {
+                "itemId": 2310783692,
+                "itemName": "12pcs 56cm Artificial Pampas Grass Bouquet Simulation Dried Flower Reed Holiday Wedding Party Home",
+                "sku": "A-11-Beige Reed leaf(Pack of 12)",
+                "num": 1,
+                "image": "https://ph-live.slatic.net/p/7d923aa7013ecbcae0d8d54d04fe1a83.jpg",
+                "isAddition": 0,
+                "skuList": [
+                  {
+                    "skuId": 28614458,
+                    "itemName": "米色芦苇叶",
+                    "sku": "A-11-Beige Reed leaf",
+                    "image": "https://bigseller-1251220924.cos.accelerate.myqcloud.com/album/279590/20230706074750640dc2ad09607578d8b1546866c91cf7.jpg?imageView2/1/w/300/h/300",
+                    "num": 12,
+                    "shelfId": null,
+                    "shelfName": null,
+                    "canModify": 0,
+                    "isAddition": null,
+                    "rate": 12,
+                    "skuGroupId": 20874
+                  }
+                ]
+              },
+              {
+                "itemId": 2310783693,
+                "itemName": "12pcs 56cm Artificial Pampas Grass Bouquet Simulation Dried Flower Reed Holiday Wedding Party Home",
+                "sku": "A-11-Brown Reed leaf(Pack of 12)",
+                "num": 1,
+                "image": "https://ph-live.slatic.net/p/df9f2698fd6e99aabed846629904cc6f.jpg",
+                "isAddition": 0,
+                "skuList": [
+                  {
+                    "skuId": 32855167,
+                    "itemName": "褐色芦苇叶-1pcs",
+                    "sku": "A-11-Brown Reed leaf",
+                    "image": "https://bigseller-1251220924.cos.accelerate.myqcloud.com/album/279590/20230921032407789265c025e8d2aadb754cf2c48f9366.jpg?imageView2/1/w/300/h/300",
+                    "num": 12,
+                    "shelfId": null,
+                    "shelfName": null,
+                    "canModify": 0,
+                    "isAddition": null,
+                    "rate": 12,
+                    "skuGroupId": 23131
+                  }
+                ]
+              },
+              {
+                "itemId": 2310783694,
+                "itemName": "12pcs 56cm Artificial Pampas Grass Bouquet Simulation Dried Flower Reed Holiday Wedding Party Home",
+                "sku": "A-11-Grey Reed leaf(Pack of 12).",
+                "num": 1,
+                "image": "https://ph-live.slatic.net/p/ee0650ffc0b4c5e5a27cbc304e416a80.jpg",
+                "isAddition": 0,
+                "skuList": [
+                  {
+                    "skuId": 36800655,
+                    "itemName": "灰色芦苇叶一条",
+                    "sku": "A-11-Grey Reed leaf",
+                    "image": "https://bigseller-1251220924.cos.accelerate.myqcloud.com/album/279590/20240103064922aa407aed7142bd60f8a3ef881ce5317b.jpg?imageView2/1/w/300/h/300",
+                    "num": 12,
+                    "shelfId": null,
+                    "shelfName": null,
+                    "canModify": 0,
+                    "isAddition": null,
+                    "rate": 12,
+                    "skuGroupId": 28959
+                  }
+                ]
+              }
+            ],
+            "split": false
+          }
+        """
+        url = f"https://www.bigseller.com/api/v1/order/refund/before/getReturnInfo.json"
+        req = {
+            "searchContent": tracking_no,
+            "historyOrder": False,
+            "warehouseId": str(warehouse_id)
+            "zoneId": ""
+        }
+        res = self.session.get(url, req).json()
+        if res["code"] != 0:
+            print(f"query_refund_order_info_by_tracking_no failed.")
+            print(json.dumps(res, indent=2))
+            raise Exception(f"query_refund_order_info_by_tracking_no failed.")
+        return res["data"]
+
+    def return_refund_order_to_warehouse(self, refund_order: dict, warehouse_id: int):
+        """
+        自动退单
+        :param refund_order: 由query_refund_order_info_by_tracking_no查询的信息
+        :param warehouse_id: 仓库id
+        :return:
+        """
+        url = "https://www.bigseller.com/api/v1/order/refund/before/returnWarehousing.json"
+        req = {
+          "warehouseId": warehouse_id,
+          "opType": 1,
+          "isScan": 1,
+          "orderInfoList": refund_order
+        }
+        res = self.session.post(url, json=req).json()
+        self.save_cookies()
+        if res["code"] != 0:
+            raise Exception("return_refund_order_to_warehouse failed: http response msg: " + res["msg"])
+        return res["data"]["data"]
