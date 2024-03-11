@@ -511,10 +511,10 @@ class BigSellerClient:
             }
             res = self.session.post("https://www.bigseller.com/api/v1/order/refund/before/pageList.json",
                                     json=req).json()
-            total_page = res["data"]["totalPage"]
-            total_size = res["data"]["totalSize"]
+            total_page = res["data"]["page"]["totalPage"]
+            total_size = res["data"]["page"]["totalSize"]
             print(f"load page {page_no}/{total_page} data")
-            for r in res["data"]["rows"]:
+            for r in res["data"]["page"]["rows"]:
                 tracking_no_list.append(
                     r["trackingNo"]
                 )
