@@ -624,7 +624,7 @@ class BigSellerClient:
             "warehouseId": str(warehouse_id),
             "zoneId": ""
         }
-        res = self.session.get(url, req).json()
+        res = self.session.post(url, req).json()
         if res["code"] != 0:
             print(f"query_refund_order_info_by_tracking_no failed.")
             print(json.dumps(res, indent=2))
