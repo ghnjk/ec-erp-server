@@ -643,7 +643,7 @@ class BigSellerClient:
             "warehouseId": warehouse_id,
             "opType": 1,
             "isScan": 1,
-            "orderInfoList": refund_order
+            "orderInfoList": [refund_order]
         }
         res = self.session.post(url, json=req).json()
         self.save_cookies()
