@@ -514,6 +514,8 @@ class BigSellerClient:
             total_page = res["data"]["page"]["totalPage"]
             total_size = res["data"]["page"]["totalSize"]
             print(f"load page {page_no}/{total_page} data")
+            if total_page == 0:
+                break
             for r in res["data"]["page"]["rows"]:
                 tracking_no_list.append(
                     r["trackingNo"]
