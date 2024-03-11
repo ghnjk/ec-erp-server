@@ -649,4 +649,4 @@ class BigSellerClient:
         self.save_cookies()
         if res["code"] != 0:
             raise Exception("return_refund_order_to_warehouse failed: http response msg: " + res["msg"])
-        return res["data"]["data"]
+        return res["data"]
