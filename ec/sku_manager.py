@@ -88,7 +88,7 @@ class SkuManager(object):
                     r["sku"]
                 ] = []
             elif r["productCount"] > len(r["skuRelations"]):
-                if r["productCount"] > len(
+                if r["sku"] not in self.sku_detail_variant or r["productCount"] > len(
                         self.sku_detail_variant[r["sku"]]
                 ):
                     print(f"query more mapping for sku " + r["sku"] + " count " + str(r["productCount"]))
