@@ -27,9 +27,7 @@ def import_sku():
     client = BigSellerClient(config["ydm_token"], cookies_file_path="../cookies/big_seller.cookies")
     client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
     sm = SkuManager(local_db_path="../cookies/all_sku.json")
-    for row in client.load_all_sku():
-        sm.add(row)
-    sm.dump()
+    sm.load_and_update_all_sku(client)
     df = pd.read_excel(sys.argv[1], sheet_name="SKU信息")
     for idx, row in df.iterrows():
         sku_group = row["SKU分组"]
@@ -55,6 +53,7 @@ def import_sku():
             sku_unit_name="",
             sku_unit_quantity=1,
             avg_sell_quantity=0,
+            inventory_support_days=0,
             shipping_stock_quantity=0
         )
         backend.store_sku(s)
