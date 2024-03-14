@@ -96,6 +96,7 @@ def save_sku():
     sku_unit_quantity = request_util.get_int_param("sku_unit_quantity")
     avg_sell_quantity = request_util.get_int_param("avg_sell_quantity")
     shipping_stock_quantity = request_util.get_int_param("shipping_stock_quantity")
+    inventory_support_days = request_util.get_int_param("inventory_support_days")
     sku_id = sm.get_sku_id(sku)
     if sku_id is None:
         sm = load_all_sku(client)
@@ -121,6 +122,7 @@ def save_sku():
         sku_unit_name=sku_unit_name,
         sku_unit_quantity=sku_unit_quantity,
         avg_sell_quantity=avg_sell_quantity,
+        inventory_support_days=inventory_support_days,
         shipping_stock_quantity=shipping_stock_quantity
     )
     request_context.get_backend().store_sku(s)
