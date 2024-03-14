@@ -27,6 +27,7 @@ def import_sku():
     client = BigSellerClient(config["ydm_token"], cookies_file_path="../cookies/big_seller.cookies")
     client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
     sm = SkuManager(local_db_path="../cookies/all_sku.json")
+    sm.load()
     sm.load_and_update_all_sku(client)
     df = pd.read_excel(sys.argv[1], sheet_name="SKU信息")
     for idx, row in df.iterrows():
