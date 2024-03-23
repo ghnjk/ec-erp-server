@@ -40,7 +40,7 @@ def load_all_shipping_sku_info(backend: MysqlBackend):
     for order in backend.load_shipping_purchase_order():
         for item in order.purchase_skus:
             sku = item["sku"]
-            if sku not in sku_map.keys():
+            if sku not in shipping_sku_map.keys():
                 shipping_sku_map[sku] = 0
             shipping_sku_map[sku] += item.get("quantity", 0) * item.get("sku_unit_quantity", 1)
     return shipping_sku_map
