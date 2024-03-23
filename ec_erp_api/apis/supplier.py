@@ -129,6 +129,82 @@ def save_sku():
     return response_util.pack_response(DtoUtil.to_dict(s))
 
 
+@supplier_apis.route('/add_sku', methods=["POST"])
+def add_sku():
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
+    config = get_app_config()
+    cookies_dir = config.get("cookies_dir", "../cookies")
+    sm = SkuManager(local_db_path=os.path.join(cookies_dir, "all_sku.json"))
+    sm.load()
+    client = BigSellerClient(config["ydm_token"], cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))
+    client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+    skus = request_util.get_str_param("skus").strip()
+    backend = request_context.get_backend()
+    has_load_all_sku = False
+    op_detail = {}
+    success_count = 0
+    ignore_count = 0
+    fail_count = 0
+    for line in skus.split("\n"):
+        line = line.strip()
+        if len(line) <= 0:
+            continue
+        sku = line
+        # 检测数据库中是否有该sku
+        if backend.get_sku(sku) is not None:
+            op_detail[sku] = "ignored"
+            ignore_count += 1
+            continue
+        sku_group = "待定"
+        sku_name = ""
+        sku_unit_name = ""
+        sku_unit_quantity = 1
+        avg_sell_quantity = 0
+        shipping_stock_quantity = 0
+        inventory_support_days = 0
+        sku_id = sm.get_sku_id(sku)
+        if sku_id is None and not has_load_all_sku:
+            sm = load_all_sku(client)
+            has_load_all_sku = True
+        sku_id = sm.get_sku_id(sku)
+        if sku_id is None:
+            op_detail[sku] = f"sku {sku} 不存在"
+            fail_count += 1
+            continue
+        sku_info = client.query_sku_detail(
+            sku_id
+        )
+        inventory = 0
+        for vo in sku_info["warehouseVoList"]:
+            inventory += vo["available"]
+        s = SkuDto(
+            project_id=request_context.get_current_project_id(),
+            sku=sku,
+            sku_group=sku_group,
+            sku_name=sku_name,
+            inventory=inventory,
+            erp_sku_name=sku_info["title"],
+            erp_sku_image_url=sku_info["imgUrl"],
+            erp_sku_id=str(sku_info["id"]),
+            erp_sku_info={},
+            sku_unit_name=sku_unit_name,
+            sku_unit_quantity=sku_unit_quantity,
+            avg_sell_quantity=avg_sell_quantity,
+            inventory_support_days=inventory_support_days,
+            shipping_stock_quantity=shipping_stock_quantity
+        )
+        request_context.get_backend().store_sku(s)
+        success_count += 1
+        op_detail[sku] = f"success"
+    return response_util.pack_response({
+        "success_count": success_count,
+        "ignore_count": ignore_count,
+        "fail_count": fail_count,
+        "detail": op_detail
+    })
+
+
 @supplier_apis.route('/sync_all_sku', methods=["POST"])
 def sync_all_sku():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
@@ -224,18 +300,23 @@ def build_purchase_order_from_req() -> PurchaseOrder:
         sku_info = request_context.get_backend().get_sku(sku)
         if sku is None:
             raise Exception(f"商品sku [{sku}] 不存在")
+        if item["quantity"] is None:
+            quantity = None
+        else:
+            quantity = int(item["quantity"])
         format_purchase_skus.append({
             "sku": sku,
             "sku_group": sku_info.sku_group,
             "sku_name": sku_info.sku_name,
             "unit_price": int(item["unit_price"]),
-            "quantity": int(item["quantity"]),
+            "quantity": quantity,
             "sku_unit_name": sku_info.sku_unit_name,
             "sku_unit_quantity": sku_info.sku_unit_quantity,
             "avg_sell_quantity": sku_info.avg_sell_quantity,
             "shipping_stock_quantity": sku_info.shipping_stock_quantity
         })
-        sku_amount += int(item["unit_price"]) * int(item["quantity"])
+        if quantity is not None:
+            sku_amount += int(item["unit_price"]) * quantity
     store_skus = request_util.get_param("store_skus", [])
     format_store_skus = []
     for item in store_skus:
@@ -381,6 +462,10 @@ def submit_purchase_order_and_next_step():
         order.purchase_step = "供应商捡货中"
     elif order.purchase_step == "供应商捡货中":
         order.purchase_skus = remove_empty_sku(order.purchase_skus)
+        # 确认是否存在待定的sku
+        for item in order.purchase_skus:
+            if item["quantity"] is None:
+                return response_util.pack_error_response(1004, "存在未确定数量的sku•")
         # 更新供应价到db
         save_purchase_price(order)
         order.purchase_date = datetime.datetime.now().strftime("%Y-%m-%d")
