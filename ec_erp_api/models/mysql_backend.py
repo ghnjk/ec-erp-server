@@ -271,6 +271,7 @@ class PurchaseOrder(DtoBase):
             "sku_group": "",
             "sku_name": "",
             "unit_price": 1200,
+            "sku_unit_quantity": 1,
             "quantity"： 30
         }
     ]
@@ -283,6 +284,7 @@ class PurchaseOrder(DtoBase):
             "sku_group": "",
             "sku_name": "",
             "quantity"： 30,
+            "sku_unit_quantity": 1,
             "check_in_quantity"： 30,
         }
     ]
@@ -731,6 +733,22 @@ class MysqlBackend(object):
             logging.error(f"store purchase_order order_id {purchase_order.purchase_order_id}"
                           f"  failed: {e}")
             raise
+
+    def load_shipping_purchase_order(self) -> typing.List[PurchaseOrder]:
+        """
+        加载所有采购中的sku
+        :return:
+        """
+        session = self.DBSession()
+        q = session.query(PurchaseOrder).filter(PurchaseOrder.project_id == self.project_id).filter(
+            PurchaseOrder.purchase_step.in_([
+                "待发货", "海运中", "已入库"
+            ])
+        ).order_by(
+            PurchaseOrder.purchase_order_id.desc())
+        records = q.all()
+        session.close()
+        return records
 
     def search_purchase_order(self, offset, limit) -> typing.Tuple[int, typing.List[PurchaseOrder]]:
         session = self.DBSession()

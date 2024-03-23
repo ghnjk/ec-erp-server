@@ -43,7 +43,7 @@ def build_sku_manager() -> SkuManager:
     return sku_manager
 
 
-def build_backend(project_id: str):
+def build_backend(project_id: str) -> MysqlBackend:
     config = get_app_config()
     db_config = config["db_config"]
     backend = MysqlBackend(
