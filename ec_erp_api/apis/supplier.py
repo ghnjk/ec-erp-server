@@ -69,16 +69,6 @@ def search_sku():
     return response_util.pack_pagination_result(total, records)
 
 
-def load_all_sku(client: BigSellerClient) -> SkuManager:
-    config = get_app_config()
-    cookies_dir = config.get("cookies_dir", "../cookies")
-    sm = SkuManager(local_db_path=os.path.join(cookies_dir, "all_sku.json"))
-    for row in client.load_all_sku():
-        sm.add(row)
-    sm.dump()
-    return sm
-
-
 @supplier_apis.route('/save_sku', methods=["POST"])
 def save_sku():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
@@ -99,7 +89,7 @@ def save_sku():
     inventory_support_days = request_util.get_int_param("inventory_support_days")
     sku_id = sm.get_sku_id(sku)
     if sku_id is None:
-        sm = load_all_sku(client)
+        sm.load_and_update_all_sku(client)
     sku_id = sm.get_sku_id(sku)
     if sku_id is None:
         return response_util.pack_error_response(1003, f"sku {sku} 不存在")
@@ -165,7 +155,7 @@ def add_sku():
         inventory_support_days = 0
         sku_id = sm.get_sku_id(sku)
         if sku_id is None and not has_load_all_sku:
-            sm = load_all_sku(client)
+            sm.load_and_update_all_sku(client)
             has_load_all_sku = True
         sku_id = sm.get_sku_id(sku)
         if sku_id is None:
@@ -222,7 +212,7 @@ def sync_all_sku():
     for item in sku_list:
         sku_id = sm.get_sku_id(item.sku)
         if sku_id is None and not has_load_all_sku:
-            sm = load_all_sku(client)
+            sm.load_and_update_all_sku(client)
             has_load_all_sku = True
         sku_id = sm.get_sku_id(item.sku)
         if sku_id is None:
