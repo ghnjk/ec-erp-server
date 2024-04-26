@@ -7,11 +7,14 @@
 """
 from flask import Flask
 from ec_erp_api.app_config import get_app_config
+import logging
 
 app_config = get_app_config()
 
 
 def create_app():
+    logging.getLogger("ACC").setLevel(logging.INFO)
+
     from ec_erp_api.apis.system import system_apis
     from ec_erp_api.apis.supplier import supplier_apis
     app = Flask(app_config["application"], static_url_path='')

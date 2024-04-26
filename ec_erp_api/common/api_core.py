@@ -28,16 +28,17 @@ def api_post_request():
     def api_decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kw):
+            logger = logging.getLogger("ACC")
             start = time.time()
             api_request = request.json
             trace_id = f"TRACE_{time.time()}"
-            logging.info(
+            logger.info(
                 f"REQUEST: {trace_id} {request.path} body: {json.dumps(api_request, ensure_ascii=False)}")
             try:
                 api_response = func(*args, **kw)
             except Exception as e:
-                logging.error(f"EXCEPTION {trace_id} process oms request error: {e}")
-                logging.error(traceback.format_exc())
+                logger.error(f"EXCEPTION {trace_id} process oms request error: {e}")
+                logger.error(traceback.format_exc())
                 api_response = {
                     "result": "1001",
                     "resultMsg": str(e),
@@ -46,7 +47,7 @@ def api_post_request():
                 }
             end = time.time()
             cost_time_ms = int((end - start) * 1000)
-            logging.info(
+            logger.info(
                 f"RESPONSE: {trace_id} {request.path} "
                 f"cost {cost_time_ms} ms body: {json.dumps(api_response, ensure_ascii=False)}")
             return jsonify(api_response)

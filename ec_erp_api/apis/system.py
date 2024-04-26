@@ -36,7 +36,7 @@ def login_user_with_token():
         user = request_context.get_backend().get_user(user_name)
         print(f"user: {user.password}")
         if user is None or user.is_delete or password != user.password:
-            return response_util.pack_error_response(1002, "用户不存在或者密码异常")
+            return response_util.pack_error_json_response(1002, "用户不存在或者密码异常")
         session["user_name"] = user.user_name
         session["project_id"] = user.default_project_id
     return _get_login_user_info()
