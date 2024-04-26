@@ -7,6 +7,7 @@
 """
 import typing
 from flask import request
+from urllib.parse import parse_qs
 
 
 def get_trace_id() -> str:
@@ -62,3 +63,13 @@ def check_params(param_name_list: list) -> bool:
         if p not in request.json.get("body", {}):
             return False
     return True
+
+
+def parse_url_query_string(query_str: str) -> dict:
+    parsed_dict = parse_qs(query_str)
+
+    # parse_qs 返回的是每个键对应一个列表的字典
+    # 因为同一个键可能对应多个值
+    # 如果你知道每个键只对应一个值，你可以这样获取它们：
+    query_dict = {k: v[0] for k, v in parsed_dict.items()}
+    return query_dict
