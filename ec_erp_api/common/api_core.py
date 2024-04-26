@@ -33,7 +33,8 @@ def set_file_logger(
     """
     if logger is None:
         logger = logging.getLogger()
-    # clear_logger_handlers(logger)
+    logger.setLevel(log_level)
+    clear_logger_handlers(logger)
     formatter = logging.Formatter(
         "[%(asctime)s %(msecs)03d][%(process)d][tid=%(thread)d][%(name)s][%(levelname)s] %(message)s [%(filename)s"
         " %(funcName)s %(lineno)s] ",
@@ -45,7 +46,6 @@ def set_file_logger(
         backupCount=max_file_count,
         encoding=encoding,
     )
-    handler.setLevel(log_level)
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
