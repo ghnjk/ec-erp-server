@@ -8,15 +8,16 @@
 from flask import Flask
 from ec_erp_api.app_config import get_app_config
 import logging
+from ec_erp_api.common.api_core import set_file_logger
 
 app_config = get_app_config()
 
 
 def create_app():
-    logging.getLogger("ACC").setLevel(logging.INFO)
-
     from ec_erp_api.apis.system import system_apis
     from ec_erp_api.apis.supplier import supplier_apis
+    set_file_logger(logging.getLogger("ACC"), "acc.log")
+
     app = Flask(app_config["application"], static_url_path='')
     app.static_folder = "./static"
     app.register_blueprint(system_apis, url_prefix="/erp_api/system")
