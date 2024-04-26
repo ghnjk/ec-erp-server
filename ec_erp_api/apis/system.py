@@ -5,7 +5,6 @@
 @author: jkguo
 @create: 2024/2/24
 """
-import logging
 
 from ec_erp_api.common import request_util, response_util, request_context
 from flask import (
@@ -20,30 +19,18 @@ system_apis = Blueprint('system', __name__)
 @system_apis.route('/login_user_with_token', methods=["POST"])
 @api_post_request()
 def login_user_with_token():
-    logger = logging.getLogger("ACC")
-    logger.error("login_user_with_token")
     token = request_util.get_str_param("token")
     if token is None or token == "":
         return _get_login_user_info()
     else:
-        logger.error(f"token: {token}")
         # 将token base64 decode
         token = codec_util.base64_decode(token)
-        logger.error(f"token: {token}")
         # 将token字符串按照url query string格式转成dict
         token_dict = request_util.parse_url_query_string(token)
         user_name = token_dict.get("user_name").strip()
         password = token_dict.get("password").strip()
-        logger.error(f"user_name: {user_name} password: {password}")
         password = codec_util.calc_sha256(password)
-        logger.error(f"user_name: {user_name} password: {password}")
         user = request_context.get_backend().get_user(user_name)
-        if user is None:
-            logger.error("user is None")
-        else:
-            logger.error(f"user is not None")
-            logger.error(f"user name: {user.user_name}")
-            logger.error(f"user: {user.password}")
         if user is None or user.is_delete or password != user.password:
             return response_util.pack_error_json_response(1002, "用户不存在或者密码异常")
         session["user_name"] = user.user_name
@@ -54,12 +41,9 @@ def login_user_with_token():
 @system_apis.route('/login_user', methods=["POST"])
 @api_post_request()
 def login_user():
-    logger = logging.getLogger("ACC")
     user_name = request_util.get_str_param("account")
     password = request_util.get_str_param("password")
-    logger.error(f"user_name: {user_name} password: {password}")
     password = codec_util.calc_sha256(password)
-    logger.error(f"user_name: {user_name} password: {password}")
     user = request_context.get_backend().get_user(user_name)
     if user is None or user.is_delete or password != user.password:
         return response_util.pack_error_json_response(1002, "用户不存在或者密码异常")

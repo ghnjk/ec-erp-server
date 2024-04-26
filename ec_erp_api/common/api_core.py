@@ -33,8 +33,7 @@ def set_file_logger(
     """
     if logger is None:
         logger = logging.getLogger()
-    clear_logger_handlers(logger)
-    logger.propagate = False
+    # clear_logger_handlers(logger)
     formatter = logging.Formatter(
         "[%(asctime)s %(msecs)03d][%(process)d][tid=%(thread)d][%(name)s][%(levelname)s] %(message)s [%(filename)s"
         " %(funcName)s %(lineno)s] ",
@@ -70,7 +69,7 @@ def api_post_request():
             start = time.time()
             api_request = request.json
             trace_id = f"TRACE_{time.time()}"
-            logger.error(
+            logger.info(
                 f"REQUEST: {trace_id} {request.path} body: {json.dumps(api_request, ensure_ascii=False)}")
             try:
                 api_response = func(*args, **kw)
@@ -85,7 +84,7 @@ def api_post_request():
                 }
             end = time.time()
             cost_time_ms = int((end - start) * 1000)
-            logger.error(
+            logger.info(
                 f"RESPONSE: {trace_id} {request.path} "
                 f"cost {cost_time_ms} ms body: {json.dumps(api_response, ensure_ascii=False)}")
             return jsonify(api_response)

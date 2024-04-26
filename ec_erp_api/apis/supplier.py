@@ -9,7 +9,7 @@ import copy
 import datetime
 import os
 import time
-
+from ec_erp_api.common.api_core import api_post_request
 from ec_erp_api.common import request_util, response_util, request_context
 from flask import (
     Blueprint
@@ -24,6 +24,7 @@ supplier_apis = Blueprint('supplier', __name__)
 
 
 @supplier_apis.route('/search_supplier', methods=["POST"])
+@api_post_request()
 def search_supplier():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
@@ -37,6 +38,7 @@ def search_supplier():
 
 
 @supplier_apis.route('/search_sku', methods=["POST"])
+@api_post_request()
 def search_sku():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
@@ -70,6 +72,7 @@ def search_sku():
 
 
 @supplier_apis.route('/save_sku', methods=["POST"])
+@api_post_request()
 def save_sku():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
@@ -120,6 +123,7 @@ def save_sku():
 
 
 @supplier_apis.route('/add_sku', methods=["POST"])
+@api_post_request()
 def add_sku():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
@@ -196,6 +200,7 @@ def add_sku():
 
 
 @supplier_apis.route('/sync_all_sku', methods=["POST"])
+@api_post_request()
 def sync_all_sku():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
@@ -236,6 +241,7 @@ def sync_all_sku():
 
 
 @supplier_apis.route('/search_sku_purchase_price', methods=["POST"])
+@api_post_request()
 def search_sku_purchase_price():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
@@ -249,6 +255,7 @@ def search_sku_purchase_price():
 
 
 @supplier_apis.route('/search_purchase_order', methods=["POST"])
+@api_post_request()
 def search_purchase_order():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
@@ -262,6 +269,7 @@ def search_purchase_order():
 
 
 @supplier_apis.route('/query_sku_purchase_price', methods=["POST"])
+@api_post_request()
 def query_sku_purchase_price():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
@@ -349,6 +357,7 @@ def build_purchase_order_from_req() -> PurchaseOrder:
 
 
 @supplier_apis.route('/save_purchase_order', methods=["POST"])
+@api_post_request()
 def save_purchase_order():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
@@ -433,6 +442,7 @@ def sync_stock_to_erp(order: PurchaseOrder):
 
 
 @supplier_apis.route('/submit_purchase_order_and_next_step', methods=["POST"])
+@api_post_request()
 def submit_purchase_order_and_next_step():
     """
     采购流程图：
