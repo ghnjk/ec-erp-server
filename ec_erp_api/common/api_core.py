@@ -38,17 +38,17 @@ def api_post_request():
             except Exception as e:
                 logging.error(f"EXCEPTION {trace_id} process oms request error: {e}")
                 logging.error(traceback.format_exc())
-                api_response = jsonify({
+                api_response = {
                     "result": "1001",
                     "resultMsg": str(e),
                     "traceId": trace_id,
                     "data": None
-                })
+                }
             end = time.time()
             cost_time_ms = int((end - start) * 1000)
             logging.info(
                 f"RESPONSE: {trace_id} {request.path} "
-                f"cost {cost_time_ms} ms body: {json.dumps(api_response.get_json(), ensure_ascii=False)}")
+                f"cost {cost_time_ms} ms body: {json.dumps(api_response, ensure_ascii=False)}")
             return jsonify(api_response)
 
         return wrapper

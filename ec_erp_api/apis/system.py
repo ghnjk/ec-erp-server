@@ -16,7 +16,7 @@ system_apis = Blueprint('system', __name__)
 
 
 @system_apis.route('/login_user_with_token', methods=["POST"])
-@api_post_request
+@api_post_request()
 def login_user_with_token():
     print("login_user_with_token")
     token = request_util.get_str_param("token")
@@ -55,8 +55,7 @@ def login_user():
     return get_login_user_info()
 
 
-@system_apis.route("/get_login_user_info", methods=["POST"])
-def get_login_user_info():
+def _get_login_user_info():
     user = request_context.get_current_user()
     project_id = request_context.get_current_project_id()
     if user is None:
@@ -65,9 +64,15 @@ def get_login_user_info():
     for r in user.roles:
         if r["project_id"] == project_id:
             roles.append(r)
-    return response_util.pack_response({
+    return response_util.pack_json_response({
         "userName": user.user_name,
         "groupName": "",
         "roles": roles,
         "admin": user.is_admin
     })
+
+
+@system_apis.route("/get_login_user_info", methods=["POST"])
+@api_post_request()
+def get_login_user_info():
+    return _get_login_user_info()
