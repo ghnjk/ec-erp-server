@@ -32,8 +32,8 @@ def login_user_with_token():
         logger.error(f"token: {token}")
         # 将token字符串按照url query string格式转成dict
         token_dict = request_util.parse_url_query_string(token)
-        user_name = token_dict.get("user_name")
-        password = token_dict.get("password")
+        user_name = token_dict.get("user_name").strip()
+        password = token_dict.get("password").strip()
         logger.error(f"user_name: {user_name} password: {password}")
         password = codec_util.calc_sha256(password)
         logger.error(f"user_name: {user_name} password: {password}")
