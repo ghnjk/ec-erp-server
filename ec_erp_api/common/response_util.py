@@ -36,12 +36,12 @@ def pack_response(data: dict, result: int = 0, result_msg: str = "success"):
 
 
 def pack_json_response(data: dict, result: int = 0, result_msg: str = "success"):
-    return jsonify({
+    return {
         "result": result,
         "resultMsg": result_msg,
         "traceId": get_trace_id(),
         "data": data
-    })
+    }
 
 
 def pack_pagination_result(total: int, records):
