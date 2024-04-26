@@ -16,7 +16,7 @@ app_config = get_app_config()
 def create_app():
     from ec_erp_api.apis.system import system_apis
     from ec_erp_api.apis.supplier import supplier_apis
-    set_file_logger(logging.getLogger("ACC"), "acc.log")
+    set_file_logger("acc.log", logger=logging.getLogger("ACC"))
 
     app = Flask(app_config["application"], static_url_path='')
     app.static_folder = "./static"
