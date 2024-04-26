@@ -15,7 +15,7 @@ system_apis = Blueprint('system', __name__)
 
 
 @system_apis.route('/login_user_with_token', methods=["POST"])
-def login_user():
+def login_user_with_token():
     token = request_util.get_str_param("token")
     if token is None or token == "":
         return get_login_user_info()
