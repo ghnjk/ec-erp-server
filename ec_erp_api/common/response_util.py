@@ -18,6 +18,14 @@ def pack_error_response(result: int = -1, result_msg: str = "fail"):
     })
 
 
+def pack_error_json_response(result: int = -1, result_msg: str = "fail"):
+    return {
+        "result": result,
+        "resultMsg": result_msg,
+        "traceId": get_trace_id(),
+    }
+
+
 def pack_response(data: dict, result: int = 0, result_msg: str = "success"):
     return jsonify({
         "result": result,

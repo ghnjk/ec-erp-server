@@ -21,7 +21,7 @@ def login_user_with_token():
     print("login_user_with_token")
     token = request_util.get_str_param("token")
     if token is None or token == "":
-        return get_login_user_info()
+        return _get_login_user_info()
     else:
         print(f"token: {token}")
         # 将token base64 decode
@@ -39,7 +39,7 @@ def login_user_with_token():
             return response_util.pack_error_response(1002, "用户不存在或者密码异常")
         session["user_name"] = user.user_name
         session["project_id"] = user.default_project_id
-    return get_login_user_info()
+    return _get_login_user_info()
 
 
 @system_apis.route('/login_user', methods=["POST"])
@@ -59,7 +59,7 @@ def _get_login_user_info():
     user = request_context.get_current_user()
     project_id = request_context.get_current_project_id()
     if user is None:
-        return response_util.pack_error_response(1001, "not login.")
+        return response_util.pack_error_json_response(1001, "not login.")
     roles = []
     for r in user.roles:
         if r["project_id"] == project_id:
