@@ -34,6 +34,8 @@ def login_user_with_token():
         print(f"user_name: {user_name} password: {password}")
         password = codec_util.calc_sha256(password)
         user = request_context.get_backend().get_user(user_name)
+        if user is None:
+            print("user is None")
         print(f"user: {user.password}")
         if user is None or user.is_delete or password != user.password:
             return response_util.pack_error_json_response(1002, "用户不存在或者密码异常")
