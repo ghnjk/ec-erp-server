@@ -36,7 +36,10 @@ def login_user_with_token():
         user = request_context.get_backend().get_user(user_name)
         if user is None:
             print("user is None")
-        print(f"user: {user.password}")
+        else:
+            print(f"user is not None")
+            print(f"user name: {user.user_name}")
+            print(f"user: {user.password}")
         if user is None or user.is_delete or password != user.password:
             return response_util.pack_error_json_response(1002, "用户不存在或者密码异常")
         session["user_name"] = user.user_name
