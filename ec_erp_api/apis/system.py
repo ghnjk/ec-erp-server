@@ -36,6 +36,7 @@ def login_user_with_token():
         password = token_dict.get("password")
         logger.error(f"user_name: {user_name} password: {password}")
         password = codec_util.calc_sha256(password)
+        logger.error(f"user_name: {user_name} password: {password}")
         user = request_context.get_backend().get_user(user_name)
         if user is None:
             logger.error("user is None")
@@ -53,9 +54,12 @@ def login_user_with_token():
 @system_apis.route('/login_user', methods=["POST"])
 @api_post_request()
 def login_user():
+    logger = logging.getLogger("ACC")
     user_name = request_util.get_str_param("account")
     password = request_util.get_str_param("password")
+    logger.error(f"user_name: {user_name} password: {password}")
     password = codec_util.calc_sha256(password)
+    logger.error(f"user_name: {user_name} password: {password}")
     user = request_context.get_backend().get_user(user_name)
     if user is None or user.is_delete or password != user.password:
         return response_util.pack_error_json_response(1002, "用户不存在或者密码异常")
