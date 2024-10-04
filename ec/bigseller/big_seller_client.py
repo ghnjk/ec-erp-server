@@ -1086,7 +1086,7 @@ class BigSellerClient:
             "pageNo": current_page,
             "pageSize": page_size
         }
-        res = self.session.post(url, req).json()
+        res = self.session.post(url, json=req).json()
         if res["code"] != 0:
             print(f"search_wait_print_order failed.")
             print(json.dumps(res, indent=2))
