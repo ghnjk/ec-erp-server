@@ -756,7 +756,7 @@ class BigSellerClient:
             "waveSearchType": None,
             "orderConditionId": ""
         }
-        res = self.session.post(url, req).json()
+        res = self.session.post(url, json=req).json()
         if res["code"] != 0:
             print(f"get_order_status_count failed.")
             print(json.dumps(res, indent=2, ensure_ascii=False))
