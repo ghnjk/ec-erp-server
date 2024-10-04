@@ -62,8 +62,8 @@ class OrderSkuCounter(object):
     def add(self, sku, quantity, sku_info):
         if sku not in self.all_unit_skus.keys():
             self.all_unit_skus[sku] = {
-                "sku": "sku",
-                "quantity": "quantity",
+                "sku": sku,
+                "quantity": quantity,
                 "sku_info": sku_info
             }
         else:
