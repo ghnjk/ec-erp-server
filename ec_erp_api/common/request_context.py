@@ -40,6 +40,7 @@ def get_current_project_id() -> str:
 
 
 PMS_SUPPLIER = "supply"
+PMS_WAREHOUSE = "warehouse"
 
 
 def validate_user_permission(permission_name: str) -> bool:

@@ -377,6 +377,59 @@ class SkuSaleEstimateDto(DtoBase):
     ]
 
 
+class SkuPickingNote(DtoBase):
+    """
+    商品SKU拣货备注
+    """
+    __tablename__ = "t_sku_picking_note"
+    __table_args__ = (PrimaryKeyConstraint(
+        "Fproject_id", "Fsku"
+    ), {
+                          "mysql_default_charset": "utf8"
+                      })
+    project_id: Mapped[str] = Column('Fproject_id', String(128), comment='所属项目ID')
+    sku: Mapped[str] = Column('Fsku', String(512), comment='商品SKU')
+    picking_unit: Mapped[float] = Column('Fpicking_unit', Float, comment='拣货单位（1个sku的换算）')
+    picking_unit_name: Mapped[str] = Column('Fpicking_unit_name', String(256), comment='拣货单位名')
+    picking_sku_name: Mapped[str] = Column('Fpicking_sku_name', String(256), index=True, comment='拣货sku名')
+    create_time: Mapped[datetime] = Column('Fcreate_time', DateTime, index=True, default=datetime.now(),
+                                           server_default=sql.func.now(), comment='创建时间')
+    modify_time: Mapped[datetime] = Column('Fmodify_time', DateTime, index=True, default=datetime.now(),
+                                           server_default=sql.func.now(), comment='修改时间')
+    columns = [
+        "project_id", "sku", "picking_unit", "picking_unit_name",
+        "picking_sku_name", "create_time", "modify_time"
+    ]
+
+
+class OrderPrintTask(DtoBase):
+    """
+    订单打印任务
+    """
+    __tablename__ = "t_order_print_task"
+    __table_args__ = (PrimaryKeyConstraint(
+        "Fproject_id", "Ftask_id"
+    ), {
+                          "mysql_default_charset": "utf8"
+                      })
+    project_id: Mapped[str] = Column('Fproject_id', String(128), comment='所属项目ID')
+    task_id: Mapped[str] = Column('Ftask_id', String(256), comment='打印任务id')
+    pdf_file_url: Mapped[str] = Column('pdf_file_url', String(256), comment='打印的pdf地址')
+    current_step: Mapped[str] = Column('Fcurrent_step', String(1024), comment='当前任务步骤')
+    progress: Mapped[int] = Column('Fprogress', Integer, comment='当前进度0-100')
+    order_list: Mapped[list] = Column('Forder_list', JSON, comment='订单列表')
+    # string list,
+    logs: Mapped[list] = Column('Flogs', JSON, comment='处理日志')
+    create_time: Mapped[datetime] = Column('Fcreate_time', DateTime, index=True, default=datetime.now(),
+                                           server_default=sql.func.now(), comment='创建时间')
+    modify_time: Mapped[datetime] = Column('Fmodify_time', DateTime, index=True, default=datetime.now(),
+                                           server_default=sql.func.now(), comment='修改时间')
+    columns = [
+        "project_id", "task_id", "current_step", "progress", "order_list", "pdf_file_url",
+        "logs", "create_time", "modify_time"
+    ]
+
+
 class MysqlBackend(object):
     """
         状态后端接口
@@ -847,6 +900,98 @@ class MysqlBackend(object):
         except NoResultFound:
             session.close()
             return []
+
+    def get_sku_picking_note(self, sku: str) -> typing.Optional[SkuPickingNote]:
+        session = self.DBSession()
+        note = self._get_sku_picking_note(session, sku)
+        session.close()
+        return note
+
+    def _get_sku_picking_note(self, session, sku) -> typing.Optional[SkuPickingNote]:
+        try:
+            record: SkuPickingNote = session.query(SkuPickingNote).filter(
+                SkuPickingNote.project_id == self.project_id
+            ).filter(
+                SkuPickingNote.sku == sku
+            ).one()
+            return record
+        except NoResultFound:
+            return None
+
+    def store_sku_picking_note(self, note: SkuPickingNote):
+        if note.project_id != self.project_id:
+            raise Exception("sku project 非本项目数据")
+        session = self.DBSession()
+        try:
+            # 查询db是否有这个记录
+            db_dto = self._get_sku_picking_note(session, note.sku)
+
+            # 备份记录
+            if db_dto is not None:
+                note.create_time = db_dto.create_time
+                DtoUtil.copy(note, db_dto)
+                db_dto.modify_time = datetime.now()
+                session.add(db_dto)
+            else:
+                # 构建新的dto
+                note.create_time = datetime.now()
+                note.modify_time = datetime.now()
+                session.add(note)
+            # 提交事务
+            session.commit()
+            session.close()
+        except Exception as e:
+            session.rollback()
+            session.close()
+            logging.error(f"store SkuPickingNote sku {note.sku}"
+                          f"  failed: {e}")
+            raise
+
+    def get_order_print_task(self, task_id: str) -> typing.Optional[OrderPrintTask]:
+        session = self.DBSession()
+        task = self._get_order_print_task(session, task_id)
+        session.close()
+        return task
+
+    def _get_order_print_task(self, session, task_id) -> typing.Optional[OrderPrintTask]:
+        try:
+            record: OrderPrintTask = session.query(OrderPrintTask).filter(
+                SkuPickingNote.project_id == self.project_id
+            ).filter(
+                OrderPrintTask.task_id == task_id
+            ).one()
+            return record
+        except NoResultFound:
+            return None
+
+    def store_order_print_task(self, task: OrderPrintTask):
+        if task.project_id != self.project_id:
+            raise Exception("sku project 非本项目数据")
+        session = self.DBSession()
+        try:
+            # 查询db是否有这个记录
+            db_dto = self._get_order_print_task(session, task.task_id)
+
+            # 备份记录
+            if db_dto is not None:
+                task.create_time = db_dto.create_time
+                DtoUtil.copy(task, db_dto)
+                db_dto.modify_time = datetime.now()
+                session.add(db_dto)
+            else:
+                # 构建新的dto
+                task.create_time = datetime.now()
+                task.modify_time = datetime.now()
+                session.add(task)
+            # 提交事务
+            session.commit()
+            session.close()
+        except Exception as e:
+            session.rollback()
+            session.close()
+            logging.error(f"store OrderPrintTask sku {note.sku}"
+                          f"  failed: {e}")
+            raise
 
 
 def main():

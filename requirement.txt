@@ -7,3 +7,5 @@ SQLAlchemy==1.4.51
 pandas
 flask
 elasticsearch==7.14.2
+PyPDF2
+reportlab

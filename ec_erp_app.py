@@ -16,12 +16,14 @@ app_config = get_app_config()
 def create_app():
     from ec_erp_api.apis.system import system_apis
     from ec_erp_api.apis.supplier import supplier_apis
+    from ec_erp_api.apis.warehouse import warehouse_apis
     set_file_logger("acc.log", logger=logging.getLogger("ACC"))
 
     app = Flask(app_config["application"], static_url_path='')
     app.static_folder = "./static"
     app.register_blueprint(system_apis, url_prefix="/erp_api/system")
     app.register_blueprint(supplier_apis, url_prefix="/erp_api/supplier")
+    app.register_blueprint(warehouse_apis, url_prefix="/erp_api/warehouse")
     return app
 
 
