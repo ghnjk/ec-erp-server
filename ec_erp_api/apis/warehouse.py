@@ -46,7 +46,12 @@ def search_wait_print_order():
     page_size = request_util.get_int_param("page_size")
     client = big_seller_util.build_big_seller_client()
     total, rows = client.search_wait_print_order(shipping_provider_id, current_page, page_size)
-    return response_util.pack_pagination_result(total, rows)
+    return response_util.pack_json_response(
+        {
+            "total": total,
+            "list": rows
+        }
+    )
 
 
 class OrderSkuCounter(object):
