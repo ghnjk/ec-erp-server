@@ -29,9 +29,7 @@ warehouse_apis = Blueprint('warehouse', __name__)
 def get_order_statics():
     if not request_context.validate_user_permission(request_context.PMS_WAREHOUSE):
         return response_util.pack_error_response(1008, "权限不足")
-    config = get_app_config()
-    client = BigSellerClient(config["ydm_token"], cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))
-    client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+    client = big_seller_util.build_big_seller_client()
     res = client.get_wait_print_order_ship_provider_list()
     return response_util.pack_json_response({
         "ship_provider_list": res
