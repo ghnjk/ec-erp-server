@@ -215,7 +215,7 @@ def search_manual_mark_sku_picking_note():
     current_page = request_util.get_int_param("current_page")
     page_size = request_util.get_int_param("page_size")
     offset = (current_page - 1) * page_size
-    total, records = request_context.get_backend().search_sku_picking_note(offset, offset)
+    total, records = request_context.get_backend().search_sku_picking_note(offset, page_size)
     return response_util.pack_pagination_result(total, records)
 
 
