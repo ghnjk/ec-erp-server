@@ -1115,7 +1115,7 @@ class BigSellerClient:
             "mark": mark_id,
             "isLazada": is_lazada
         }
-        self.session.post(url, req).json()
+        self.session.post(url, req)
         for i in range(1000):
             time.sleep(1)
             url = f"https://www.bigseller.com/api/v1/print/print/getOrderPrintProgress.json?mark={mark_id}&type=lable"
