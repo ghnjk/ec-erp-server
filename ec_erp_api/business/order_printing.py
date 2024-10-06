@@ -47,6 +47,8 @@ class PrintOrderThread(threading.Thread):
         if self._download_all_order_pdf():
             # 合成PDF
             self._gen_merge_pdf()
+            # 添加所有打单编辑
+            self._mark_all_order_printed()
             # 设置下载地址
             self.task.current_step = "PDF已生成，请下载并打印"
             self.task.pdf_file_url = self.print_pdf_url
@@ -197,3 +199,14 @@ class PrintOrderThread(threading.Thread):
             picking_sku_name = note["picking_sku_name"]
             note_list.append(f" * {picking_quantity} {picking_unit_name} {picking_sku_name}")
         return note_list
+
+    def _mark_all_order_printed(self):
+        for order in self.task.order_list:
+            try:
+                order_id = order["id"]
+                self.client.mark_order_printed(order_id)
+                self.log(f"订单{order_id}标记【已打印】")
+                append_log_to_task(self.task, f"订单{order_id}标记【已打印】")
+                self._save_task()
+            except Exception as e:
+                self.log(e)

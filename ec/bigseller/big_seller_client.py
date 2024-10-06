@@ -1423,3 +1423,10 @@ class BigSellerClient:
             print(json.dumps(res, indent=2))
             raise Exception(f"get_order_detail failed.")
         return res["data"]["orderDetail"]
+
+    def mark_order_printed(self, order_id: str):
+        """
+        将订单标记为已打单
+        :param order_id:
+        :return:
+        """
