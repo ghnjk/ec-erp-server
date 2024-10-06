@@ -96,10 +96,12 @@ class SkuManager(object):
                     self.sku_detail_variant[
                         r["sku"]
                     ] = r["skuRelations"]
+                    other_mapping = client.get_more_sku_mapping(r["id"])
+                    print(f"get_more_sku_mapping return {len(other_mapping)} mapping")
                     self.sku_detail_variant[
                         r["sku"]
                     ].extend(
-                        client.get_more_sku_mapping(r["skuId"])
+                        other_mapping
                     )
             else:
                 self.sku_detail_variant[
