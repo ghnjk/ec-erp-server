@@ -30,7 +30,8 @@ def append_log_to_task(task: OrderPrintTask, log: str):
 class PrintOrderThread(threading.Thread):
 
     def __init__(self, task: OrderPrintTask, backend: MysqlBackend, client: BigSellerClient):
-        super().__init__()
+        super().__init__(daemon=True)
+        self.name = f"print-{task.task_id}"
         self.task = task
         self.backend = backend
         self.client = client
@@ -40,6 +41,7 @@ class PrintOrderThread(threading.Thread):
         self.print_pdf_url = ""
 
     def run(self):
+        self.log(f"print-task thread {threading.current_thread()} start exec task {self.task.task_id}...")
         self._prepare_base_dir()
         # 下载所有的PDF
         if self._download_all_order_pdf():
