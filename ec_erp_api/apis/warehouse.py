@@ -125,8 +125,13 @@ class OrderAnalysis(object):
                             "picking_sku_name": note.picking_sku_name
                         })
                     if quantity > 0:
+                        picking_quantity = quantity / note.picking_unit
+                        if abs(picking_quantity - round(picking_quantity)) < 0.0001:
+                            picking_quantity = str(int(picking_quantity))
+                        else:
+                            picking_quantity = "{:.1f}".format(picking_quantity),
                         picking_notes.append({
-                            "picking_quantity": "{:.1f}".format(quantity / note.picking_unit),
+                            "picking_quantity": picking_quantity,
                             "picking_unit_name": note.picking_unit_name,
                             "picking_sku_name": note.picking_sku_name
                         })
