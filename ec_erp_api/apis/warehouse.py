@@ -87,7 +87,8 @@ class OrderAnalysis(object):
                 var_sku = item["varSku"]
                 quantity = item["quantity"]
                 sku_name = self.sku_manager.get_sku_name_by_shop_sku(shop_id, var_sku)
-                self._try_find_sku_name_by_order_id(order_id, var_sku)
+                if sku_name == "UNKNOWN":
+                    sku_name = self._try_find_sku_name_by_order_id(order_id, var_sku)
                 if sku_name == "UNKNOWN":
                     print(f"商品信息匹配失败. shop id {shop_id} var_sku {var_sku}")
                     raise Exception(f"商品信息匹配失败. shop id {shop_id} var_sku {var_sku}")
