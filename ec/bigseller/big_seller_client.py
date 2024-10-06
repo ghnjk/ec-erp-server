@@ -1095,3 +1095,33 @@ class BigSellerClient:
         total = page["totalSize"]
         rows = page["rows"]
         return total, rows
+
+    def download_order_mask_pdf_file(self, order_id: str, mark_id: str, platform: str, save_pdf_file: str):
+        """
+        下载需要打印的面单
+        :param order_id:
+        :param mark_id:
+        :param platform:
+        :param save_pdf_file:
+        :return:
+        """
+        url = "https://www.bigseller.com/api/v1/print/print/selfLabel/many.json"
+        if platform.lower() == "lazada":
+            is_lazada = "true"
+        else:
+            is_lazada = "false"
+        req = {
+            "orderIds": order_id,
+            "mark": mark_id,
+            "isLazada": is_lazada
+        }
+        self.session.post(url, req).json()
+        for i in range(1000):
+            time.sleep(1)
+            url = f"https://www.bigseller.com/api/v1/print/print/getOrderPrintProgress.json?mark={mark_id}&type=lable"
+            res = self.session.get(url).json()
+            file_url = res.get("data", {}).get("fileUrl")
+            if file_url is not None and file_url != "":
+                break
+        self.download(file_url, save_pdf_file)
+      

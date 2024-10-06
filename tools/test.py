@@ -25,11 +25,10 @@ def add_mark_to_page(page, original_width, original_height, new_height):
     packet = io.BytesIO()
     can = canvas.Canvas(packet, pagesize=(original_width, new_height))
     # 在 PDF 上添加文本
-    text = """<<< Picking Note: >>> 
-            10 pcs G4
-            22 pcs W2
-            22 pcs W2
-"""
+    picking_quantity = "{:<5}".format("10")
+    picking_unit_name = "{:>4s}".format("pcs")
+    picking_sku_name = "{:<10s}".format("G-10-YELLOW")
+    text = f" * {picking_quantity} {picking_unit_name} {picking_sku_name}"
 
     ###
     from reportlab.lib.units import mm, inch
@@ -41,24 +40,28 @@ def add_mark_to_page(page, original_width, original_height, new_height):
     from reportlab.graphics.barcode import code128
     import reportlab.lib.styles
     style_sheet = getSampleStyleSheet()
-    style = style_sheet['Heading1']
+    style = style_sheet['Heading4']
     # style.fontSize = 14
     # style.leading = 10
     # style.firstLineIndent = 22
-    line_height = 20
+    line_height = 12
     cnt = 0
     mark_rect_height = new_height - original_height
     can.setFillColorRGB(0.7, 0.7, 0.7)
     can.rect(0, 0, original_width, mark_rect_height, fill=1)
 
-    for line in text.split("\n"):
-        line = line.strip()
+    for i in range(12):
+        line = text
         if len(line) == 0:
             continue
-        cnt += 1
         p = Paragraph(line, style)
-        p.wrapOn(can, 6 * inch, 8 * inch)
-        p.drawOn(can, 0, mark_rect_height - line_height * cnt)
+        p.wrapOn(can, 3 * inch, 8 * inch)
+        if i < 6:
+            p.drawOn(can, 0, mark_rect_height - line_height - line_height * cnt)
+        else:
+            p.drawOn(can, original_width / 2, mark_rect_height - line_height - line_height * (cnt - 6))
+        cnt += 1
+
     can.showPage()
     #
     # can.acroForm.textfield(text, maxlen=original_width, x=0, y=original_height, width=original_width,

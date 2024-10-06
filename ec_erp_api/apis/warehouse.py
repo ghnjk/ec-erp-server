@@ -5,9 +5,6 @@
 @author: jkguo
 @create: 2024/10/3
 """
-import copy
-import datetime
-import os
 import time
 from ec_erp_api.common.api_core import api_post_request
 from ec_erp_api.common import request_util, response_util, request_context, big_seller_util
@@ -15,11 +12,9 @@ from flask import (
     Blueprint
 )
 from ec_erp_api.models.mysql_backend import MysqlBackend, DtoUtil
-from ec_erp_api.app_config import get_app_config
-from ec.bigseller.big_seller_client import BigSellerClient
+from ec_erp_api.business.order_printing import PrintOrderThread, append_log_to_task
 from ec.sku_manager import SkuManager
 from ec_erp_api.models.mysql_backend import OrderPrintTask, SkuPickingNote
-import json
 
 warehouse_apis = Blueprint('warehouse', __name__)
 
@@ -77,11 +72,11 @@ class OrderAnalysis(object):
         self.backend = backend
         self.need_manual_mark_sku_list = []
         self.need_manual_mark_sku_keys = set()
+        self.sku_sample_desc = {}
 
     def parse_all_orders(self, order_list):
         for order in order_list:
             shop_id = order["shopId"]
-            platform = order["platform"]
             counter = OrderSkuCounter()
             picking_notes = []
             # 匹配所有sku，转成单一的sku并合并
@@ -95,13 +90,19 @@ class OrderAnalysis(object):
                 sku_group_attr = self.sku_manager.get_sku_group_attr(sku_name)
                 if sku_group_attr["is_group"] == 0:
                     sku_info = self.sku_manager.sku_map[sku_name]
+                    self.sku_sample_desc[sku_name] = self._build_sample_desc(
+                        sku_name, quantity, sku_name, quantity
+                    )
                     counter.add(sku_name, quantity, sku_info)
                 else:
                     for var_item in sku_group_attr["sku_group_items"]:
                         item_sku = var_item["varSku"]
                         item_num = var_item["num"]
                         sku_info = self.sku_manager.sku_map[item_sku]
-                        counter.add(sku_name, quantity * item_num, sku_info)
+                        self.sku_sample_desc[item_sku] = self._build_sample_desc(
+                            sku_name, quantity, item_sku, quantity * item_num
+                        )
+                        counter.add(item_sku, quantity * item_num, sku_info)
             # 添加拣货备注
             for key in counter.all_unit_skus.keys():
                 unit_sku = counter.all_unit_skus[key]
@@ -110,11 +111,20 @@ class OrderAnalysis(object):
                 if note is None:
                     self._add_need_note_sku(unit_sku)
                 else:
-                    picking_notes.append({
-                        "picking_unit": "{:.1f}".format(quantity / note.picking_unit),
-                        "picking_unit_name": note.picking_unit_name,
-                        "picking_sku_name": note.picking_sku_name
-                    })
+                    if note.support_pkg_picking and 1 <= note.pkg_picking_unit <= quantity:
+                        pkg_count = int(quantity) // int(note.pkg_picking_unit)
+                        quantity -= pkg_count * int(note.pkg_picking_unit)
+                        picking_notes.append({
+                            "picking_quantity": f"{pkg_count}",
+                            "picking_unit_name": note.pkg_picking_unit_name,
+                            "picking_sku_name": note.picking_sku_name
+                        })
+                    if quantity > 0:
+                        picking_notes.append({
+                            "picking_quantity": "{:.1f}".format(quantity / note.picking_unit),
+                            "picking_unit_name": note.picking_unit_name,
+                            "picking_sku_name": note.picking_sku_name
+                        })
             order["pickingNotes"] = picking_notes
 
     def _add_need_note_sku(self, unit_sku):
@@ -125,19 +135,20 @@ class OrderAnalysis(object):
             self.need_manual_mark_sku_keys.add(sku)
             self.need_manual_mark_sku_list.append({
                 "sku": sku,
-                "image_url": image_url
+                "image_url": image_url,
+                "desc": self.sku_sample_desc[sku]
             })
 
-
-def append_log_to_task(task: OrderPrintTask, log: str):
-    from datetime import datetime
-    # 获取当前日期和时间
-    now = datetime.now()
-    # 格式化日期和时间
-    formatted_now = now.strftime("%Y-%m-%d %H:%M:%S")
-    if task.logs is None:
-        task.logs = []
-    task.logs.append(f"{formatted_now} - {log}")
+    def _build_sample_desc(self, sku_name, quantity, item_sku, item_quantity):
+        """
+        生成前端辅助用户备注信息的案例
+        :param sku_name:
+        :param quantity:
+        :param item_sku:
+        :param item_quantity:
+        :return:
+        """
+        return f"案例：买家购买{quantity}个[{sku_name}] => 实际扣除sku: {item_quantity}个[{item_sku}]"
 
 
 @warehouse_apis.route('/pre_submit_print_order', methods=["POST"])
@@ -182,6 +193,16 @@ def submit_manual_mark_sku_picking_note():
         note.sku = item["sku"]
         note.picking_unit = float(item["picking_unit"])
         note.picking_unit_name = item["picking_unit_name"]
+        note.support_pkg_picking = item.get("support_pkg_picking", False)
+        note.pkg_picking_unit = float(item["pkg_picking_unit"])
+        note.pkg_picking_unit_name = item["pkg_picking_unit_name"]
+        if note.support_pkg_picking and note.picking_unit > note.pkg_picking_unit:
+            temp_unit = note.pkg_picking_unit
+            temp_unit_name = note.pkg_picking_unit_name
+            note.pkg_picking_unit = note.picking_unit
+            note.pkg_picking_unit_name = note.picking_unit_name
+            note.picking_unit = temp_unit
+            note.picking_unit_name = temp_unit_name
         note.picking_sku_name = item["picking_sku_name"]
         backend.store_sku_picking_note(note)
     return response_util.pack_json_response({
@@ -191,7 +212,7 @@ def submit_manual_mark_sku_picking_note():
 
 @warehouse_apis.route('/start_run_print_order_task', methods=["POST"])
 @api_post_request()
-def submit_print_order():
+def start_run_print_order_task():
     if not request_context.validate_user_permission(request_context.PMS_WAREHOUSE):
         return response_util.pack_error_response(1008, "权限不足")
     task_id = request_util.get_str_param("task_id")
@@ -200,7 +221,11 @@ def submit_print_order():
     if task is None:
         return response_util.pack_error_response(result_msg=f"打印任务{task_id}不存在")
     append_log_to_task(task, "启动打印任务")
-    # todo start a thread and run the task
+    backend.store_order_print_task(task)
+    t = PrintOrderThread(
+        task, request_context.get_backend(), big_seller_util.build_big_seller_client()
+    )
+    t.start()
     return response_util.pack_json_response({
         "task": DtoUtil.to_dict(task)
     })

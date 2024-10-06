@@ -10,7 +10,7 @@ import typing
 from datetime import datetime
 
 import sqlalchemy
-from sqlalchemy import create_engine, String, JSON, Integer, Float, DateTime, sql, Column, PrimaryKeyConstraint
+from sqlalchemy import create_engine, String, Boolean, JSON, Integer, Float, DateTime, sql, Column, PrimaryKeyConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import text
 from sqlalchemy.orm import Mapped
@@ -391,6 +391,9 @@ class SkuPickingNote(DtoBase):
     sku: Mapped[str] = Column('Fsku', String(512), comment='商品SKU')
     picking_unit: Mapped[float] = Column('Fpicking_unit', Float, comment='拣货单位（1个sku的换算）')
     picking_unit_name: Mapped[str] = Column('Fpicking_unit_name', String(256), comment='拣货单位名')
+    support_pkg_picking: Mapped[bool] = Column('Fsupport_pkg_picking', Boolean, comment='支持pkg拣货打包模式')
+    pkg_picking_unit: Mapped[float] = Column('Fpkg_picking_unit', Float, comment='pkg打包，拣货单位（1个sku的换算）')
+    pkg_picking_unit_name: Mapped[str] = Column('Fpkg_picking_unit_name', String(256), comment='pkg打包，拣货单位名')
     picking_sku_name: Mapped[str] = Column('Fpicking_sku_name', String(256), index=True, comment='拣货sku名')
     create_time: Mapped[datetime] = Column('Fcreate_time', DateTime, index=True, default=datetime.now(),
                                            server_default=sql.func.now(), comment='创建时间')
@@ -414,7 +417,7 @@ class OrderPrintTask(DtoBase):
                       })
     project_id: Mapped[str] = Column('Fproject_id', String(128), comment='所属项目ID')
     task_id: Mapped[str] = Column('Ftask_id', String(256), comment='打印任务id')
-    pdf_file_url: Mapped[str] = Column('pdf_file_url', String(256), comment='打印的pdf地址')
+    pdf_file_url: Mapped[str] = Column('Fpdf_file_url', String(256), comment='打印的pdf地址')
     current_step: Mapped[str] = Column('Fcurrent_step', String(1024), comment='当前任务步骤')
     progress: Mapped[int] = Column('Fprogress', Integer, comment='当前进度0-100')
     order_list: Mapped[list] = Column('Forder_list', JSON, comment='订单列表')

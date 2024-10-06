@@ -27,3 +27,10 @@ def get_app_config() -> dict:
         with open(get_config_file("application.json"), "r") as fp:
             __APP_CONFIG__ = json.load(fp)
     return __APP_CONFIG__
+
+
+def get_static_dir() -> str:
+    return os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "static"
+    )
