@@ -207,6 +207,18 @@ def pre_submit_print_order():
     })
 
 
+@warehouse_apis.route('/search_manual_mark_sku_picking_note', methods=["POST"])
+@api_post_request()
+def search_manual_mark_sku_picking_note():
+    if not request_context.validate_user_permission(request_context.PMS_WAREHOUSE):
+        return response_util.pack_error_response(1008, "权限不足")
+    current_page = request_util.get_int_param("current_page")
+    page_size = request_util.get_int_param("page_size")
+    offset = (current_page - 1) * page_size
+    total, records = request_context.get_backend().search_sku_picking_note(offset, offset)
+    return response_util.pack_pagination_result(total, records)
+
+
 @warehouse_apis.route('/submit_manual_mark_sku_picking_note', methods=["POST"])
 @api_post_request()
 def submit_manual_mark_sku_picking_note():

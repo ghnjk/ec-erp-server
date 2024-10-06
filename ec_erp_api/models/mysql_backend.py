@@ -401,6 +401,7 @@ class SkuPickingNote(DtoBase):
                                            server_default=sql.func.now(), comment='修改时间')
     columns = [
         "project_id", "sku", "picking_unit", "picking_unit_name",
+        "support_pkg_picking", "pkg_picking_unit", "pkg_picking_unit_name",
         "picking_sku_name", "create_time", "modify_time"
     ]
 
@@ -909,6 +910,16 @@ class MysqlBackend(object):
         note = self._get_sku_picking_note(session, sku)
         session.close()
         return note
+
+    def search_sku_picking_note(self, offset: int, limit: int) -> typing.Tuple[int, typing.List[SkuPickingNote]]:
+        session = self.DBSession()
+        q = session.query(SkuPickingNote).filter(SkuPickingNote.project_id == self.project_id).order_by(
+            SkuPickingNote.sku.asc())
+        total = q.count()
+        q = q.offset(offset).limit(limit)
+        records = q.all()
+        session.close()
+        return total, records
 
     def _get_sku_picking_note(self, session, sku) -> typing.Optional[SkuPickingNote]:
         try:
