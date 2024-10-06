@@ -81,7 +81,7 @@ class OrderAnalysis(object):
             shop_id = order["shopId"]
             counter = OrderSkuCounter()
             picking_notes = []
-            order_id = order["platformOrderId"]
+            order_id = order["id"]
             # 匹配所有sku，转成单一的sku并合并
             for item in order["orderItemList"]:
                 var_sku = item["varSku"]

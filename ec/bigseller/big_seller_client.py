@@ -1125,9 +1125,9 @@ class BigSellerClient:
                 break
         self.download(file_url, save_pdf_file)
 
-    def get_order_detail(self, order_id: str):
+    def get_order_detail(self, order_id: int):
         """
-        根据平台订单号查询订单详情
+        根据订单id查询订单详情
         :param order_id:
         :return: {
               "id": 5186982528,
