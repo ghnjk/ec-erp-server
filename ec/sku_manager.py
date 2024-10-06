@@ -99,7 +99,7 @@ class SkuManager(object):
                     self.sku_detail_variant[
                         r["sku"]
                     ].extend(
-                        client.get_more_sku_mapping(r["id"])
+                        client.get_more_sku_mapping(r["skuId"])
                     )
             else:
                 self.sku_detail_variant[
