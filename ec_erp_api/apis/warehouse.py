@@ -14,6 +14,7 @@ from flask import (
 from ec_erp_api.models.mysql_backend import MysqlBackend, DtoUtil
 from ec_erp_api.business.order_printing import PrintOrderThread, append_log_to_task
 from ec.sku_manager import SkuManager
+from ec.bigseller.big_seller_client import BigSellerClient
 from ec_erp_api.models.mysql_backend import OrderPrintTask, SkuPickingNote
 
 warehouse_apis = Blueprint('warehouse', __name__)
@@ -67,9 +68,10 @@ class OrderSkuCounter(object):
 
 class OrderAnalysis(object):
 
-    def __init__(self, sku_manager: SkuManager, backend: MysqlBackend):
+    def __init__(self, sku_manager: SkuManager, backend: MysqlBackend, client: BigSellerClient):
         self.sku_manager = sku_manager
         self.backend = backend
+        self.client = client
         self.need_manual_mark_sku_list = []
         self.need_manual_mark_sku_keys = set()
         self.sku_sample_desc = {}
@@ -79,11 +81,13 @@ class OrderAnalysis(object):
             shop_id = order["shopId"]
             counter = OrderSkuCounter()
             picking_notes = []
+            order_id = order["platformOrderId"]
             # 匹配所有sku，转成单一的sku并合并
             for item in order["orderItemList"]:
                 var_sku = item["varSku"]
                 quantity = item["quantity"]
                 sku_name = self.sku_manager.get_sku_name_by_shop_sku(shop_id, var_sku)
+                self._try_find_sku_name_by_order_id(order_id, var_sku)
                 if sku_name == "UNKNOWN":
                     print(f"商品信息匹配失败. shop id {shop_id} var_sku {var_sku}")
                     raise Exception(f"商品信息匹配失败. shop id {shop_id} var_sku {var_sku}")
@@ -150,6 +154,22 @@ class OrderAnalysis(object):
         """
         return f"案例：买家购买{quantity}个[{sku_name}] => 实际扣除sku: {item_quantity}个[{item_sku}]"
 
+    def _try_find_sku_name_by_order_id(self, order_id, var_sku):
+        """
+        尝试从叮当详情中找到sku
+        :param order_id:
+        :param var_sku:
+        :return:
+        """
+        detail = self.client.get_order_detail(order_id)
+        for item in detail["orderItemVoList"]:
+            if item["varSku"] == var_sku:
+                sku_id = item["skuId"]
+                sku_name = self.sku_manager.get_sku_name_by_sku_id(sku_id)
+                if sku_name is not None:
+                    return sku_name
+        return "UNKNOWN"
+
 
 @warehouse_apis.route('/pre_submit_print_order', methods=["POST"])
 @api_post_request()
@@ -159,7 +179,8 @@ def pre_submit_print_order():
     order_list = request_util.get_param("order_list")
     sku_manager = big_seller_util.build_sku_manager()
     backend = request_context.get_backend()
-    order_analysis = OrderAnalysis(sku_manager, backend)
+    client = big_seller_util.build_big_seller_client()
+    order_analysis = OrderAnalysis(sku_manager, backend, client)
     order_analysis.parse_all_orders(order_list)
     if len(order_analysis.need_manual_mark_sku_list) == 0:
         # 所有货品都有拣货备注

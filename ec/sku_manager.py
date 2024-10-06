@@ -21,6 +21,8 @@ class SkuManager(object):
         )
         # sku_map = dict[sku_name, sku_info]
         self.sku_map: dict = {}
+        # sku_id_map = dict[sku_id, sku_name]
+        self.sku_id_map: dict[int, str] = {}
         self.sku_detail_variant = {}
         # platform_sku_map = dict[shop_id # platform_sku, sku_name]
         self.platform_sku_map: dict = {}
@@ -33,6 +35,8 @@ class SkuManager(object):
         key = sku["sku"]
         if key in self.sku_map:
             raise f"conflict sku {key}"
+        sku_id = int(sku["id"])
+        self.sku_id_map[sku_id] = key
         if self.sku_detail_variant[key] is not None:
             for item in self.sku_detail_variant[key]:
                 shop_id = str(item["shop"]["id"]).strip()
@@ -109,3 +113,12 @@ class SkuManager(object):
                 ] = r["skuRelations"]
             self.add(r)
         self.dump()
+
+    def get_sku_name_by_sku_id(self, sku_id):
+        """
+        根据skuId查询sku名
+        :param sku_id:
+        :return:
+        """
+        sku_id = int(sku_id)
+        return self.sku_id_map.get(sku_id, None)
