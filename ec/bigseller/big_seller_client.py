@@ -1430,3 +1430,13 @@ class BigSellerClient:
         :param order_id:
         :return:
         """
+        url = "https://www.bigseller.com/api/v1/order/confirmLabelPrint.json"
+        req = {
+            "orderIds": order_id,
+            "markType": "auto"
+        }
+        res = self.session.post(url, req)
+        if res.status_code != 200:
+            time.sleep(0.5)
+            res = self.session.post(url, req)
+        print(f"mark_order_printed {order_id} result {res.text}")
