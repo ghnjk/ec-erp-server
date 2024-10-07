@@ -226,15 +226,17 @@ class PrintOrderThread(threading.Thread):
         return note_list
 
     def _mark_all_order_printed(self):
+        order_id_list = []
         for order in self.task.order_list:
-            try:
-                order_id = order["id"]
-                self.client.mark_order_printed(order_id)
-                self.log(f"订单{order_id}标记【已打印】")
-                append_log_to_task(self.task, f"订单{order_id}标记【已打印】")
-                self._save_task()
-            except Exception as e:
-                self.log(e)
+            order_id = order["id"]
+            order_id_list.append(str(order_id))
+        try:
+            self.client.mark_order_printed(",".join(order_id_list))
+            self.log(f"订单{order_id_list}标记【已打印】")
+            append_log_to_task(self.task, f"所有订单订单标记【已打印】")
+            self._save_task()
+        except Exception as e:
+            self.log(e)
         self._update_task_step("marked_all_order_printed")
 
     def _update_task_step(self, step_id):
