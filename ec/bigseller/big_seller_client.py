@@ -1447,13 +1447,14 @@ class BigSellerClient:
             res = self.post(url, req)
         print(f"mark_order_printed {order_id} result {res.text}")
 
-    def post(self, url: str, data=None, json_obj=None):
+    def post(self, url: str, data=None, json=None):
+        import json as js
         if data is not None:
-            req_text = json.dumps(data, ensure_ascii=False)[: 128]
+            req_text = js.dumps(data, ensure_ascii=False)[: 128]
         else:
-            req_text = json.dumps(json_obj, ensure_ascii=False)[: 128]
+            req_text = js.dumps(json_obj, ensure_ascii=False)[: 128]
         self.logger.info(f"POST REQUEST {url} req_text: {req_text} ...")
-        res = self.session.post(url, data=data, json=json_obj)
+        res = self.session.post(url, data=data, json=json)
         res_code = res.status_code
         res_text = res.text[:128]
         self.logger.info(f"POST RESPONSE {url} http_code: {res_code} res_text: {res_text}")
