@@ -146,10 +146,13 @@ class PrintOrderThread(threading.Thread):
         self.backend.store_order_print_task(self.task)
 
     def _add_note_to_pdf_with_merge_mode(self, cur_order_pages, picking_notes, merger):
+        from pypdf.generic import FloatObject
         for i in range(len(cur_order_pages)):
             page = cur_order_pages[i]
             original_width = page.mediabox[2]
             original_height = page.mediabox[3]
+            if isinstance(original_height, FloatObject):
+                original_height = original_height.as_numeric()
             new_height = original_height / 150.0 * 180.0
             transfer_y = new_height - original_height
             page.mediabox.upper_right = (original_width, new_height)
@@ -173,12 +176,15 @@ class PrintOrderThread(threading.Thread):
         ]
         :return:
         """
+        from pypdf.generic import FloatObject
         reader = PdfReader(origin_pdf_file)
         writer = PdfWriter()
         for i in range(len(reader.pages)):
             page = reader.pages[i]
             original_width = page.mediabox[2]
             original_height = page.mediabox[3]
+            if isinstance(original_height, FloatObject):
+                original_height = original_height.as_numeric()
             new_height = original_height / 150.0 * 180.0
             transfer_y = new_height - original_height
             page.mediabox.upper_right = (original_width, new_height)
