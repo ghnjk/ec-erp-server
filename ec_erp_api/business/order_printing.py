@@ -275,6 +275,7 @@ class PrintOrderThread(threading.Thread):
             if step["id"] == step_id:
                 self.task.current_step = step["name"]
                 self.task.progress = idx * 100 / len(all_steps)
+                append_log_to_task(self.task, f"步骤更新到 {self.task.current_step}")
                 self.log(f"打印任务 {self.task.task_id} 步骤更新到 {step_id} ({self.task.current_step})")
                 self._save_task()
                 return

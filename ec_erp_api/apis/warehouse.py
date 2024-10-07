@@ -129,7 +129,7 @@ class OrderAnalysis(object):
                         if abs(picking_quantity - round(picking_quantity)) < 0.0001:
                             picking_quantity = str(int(picking_quantity))
                         else:
-                            picking_quantity = "{:.1f}".format(picking_quantity),
+                            picking_quantity = str(round(picking_quantity, 1))
                         picking_notes.append({
                             "picking_quantity": picking_quantity,
                             "picking_unit_name": note.picking_unit_name,
