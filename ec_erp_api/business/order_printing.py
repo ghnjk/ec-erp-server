@@ -6,6 +6,7 @@
 @create: 2024/10/6
 """
 import os
+import random
 import threading
 import json
 import time
@@ -55,45 +56,53 @@ class PrintOrderThread(threading.Thread):
                 # 添加所有打单编辑
                 self._mark_all_order_printed()
                 # 设置下载地址
-                self.task.current_step = "PDF已生成，请下载并打印"
                 self.task.pdf_file_url = self.print_pdf_url
+                self._update_task_step("pdf_ready")
+            else:
+                self.task.current_step = '从bigseller下载面单失败'
                 self._save_task()
         except Exception as e:
             self.log(f"EXCEPTION {self.task.task_id} process async task error: {e}")
             self.logger.error(traceback.format_exc())
+            append_log_to_task(self.task, f"EXCEPTION {self.task.task_id} process async task error: {e}")
+            append_log_to_task(self.task, traceback.format_exc())
+            self._save_task()
 
     def _download_all_order_pdf(self):
-        idx = 0
+        order_id_list = []
+        platform_order_no_list = []
+        picking_note_list = []
+        # 解析所有订单信息
+        platform = ""
         for order in self.task.order_list:
-            idx += 1
-            mark_id = f"{self.task.task_id}{idx + 10000}"
             order_id = order["id"]
+            order_id_list.append(order_id)
+            platform_order_no = order["platformOrderId"]
+            platform_order_no_list.append(platform_order_no)
             platform = order["platform"]
             picking_notes = order["pickingNotes"]
-            self.log(f"downloading order {order_id} platform {platform} mark_id {mark_id}...")
-            self.log(json.dumps(picking_notes, ensure_ascii=False))
-            origin_pdf_file = os.path.join(self.base_dir, f"{mark_id}.origin.pdf")
-            noted_pdf_file = os.path.join(self.base_dir, f"{mark_id}.noted.pdf")
-            for i in range(4):
-                try:
-                    self.client.download_order_mask_pdf_file(order_id, mark_id, platform, origin_pdf_file)
-                    break
-                except Exception as e:
-                    time.sleep(1)
-                    self.log(f"下载异常{e}")
-                    self.logger.error(traceback.format_exc())
-            if os.path.isfile(origin_pdf_file):
-                self.task.progress = idx * 100 / len(self.task.order_list)
-                append_log_to_task(self.task, f"download order {order_id} pdf success.")
-                self._add_note_to_pdf(origin_pdf_file, noted_pdf_file, picking_notes)
-                self.pdf_list.append(noted_pdf_file)
-                self._save_task()
-            else:
-                self.task.current_step = "从bigseller下载pdf异常。"
-                append_log_to_task(self.task, f"download order {order_id} pdf failed.")
-                self._save_task()
-                return False
-        return True
+            picking_note_list.append(picking_notes)
+        self._update_task_step("parsed_all_order_info")
+        # 一次性打印所有订单到pdf
+        mark_id = f"{self.task.task_id}{random.randint(10000, 20000)}"
+        origin_all_pdf_file = os.path.join(self.base_dir, f"{self.task.task_id}.origin.all.pdf")
+        for i in range(4):
+            try:
+                self.client.download_order_mask_pdf_file(",".join(order_id_list), mark_id, platform,
+                                                         origin_all_pdf_file)
+                break
+            except Exception as e:
+                time.sleep(1)
+                self.log(f"下载异常{e}")
+                self.logger.error(traceback.format_exc())
+        self._update_task_step("downloaded_all_pdf")
+        if os.path.isfile(origin_all_pdf_file):
+            return self._split_and_note_pdf(origin_all_pdf_file, platform_order_no_list, picking_note_list)
+        else:
+            self.task.current_step = "从bigseller下载pdf异常。"
+            append_log_to_task(self.task, f"download origin_all_pdf_file pdf failed.")
+            self._save_task()
+            return False
 
     def log(self, msg):
         from datetime import datetime
@@ -113,6 +122,7 @@ class PrintOrderThread(threading.Thread):
         merger.write(self.print_pdf_file_path)
         self.log(f"合并pdf文件到{self.print_pdf_file_path}")
         append_log_to_task(self.task, f"合并pdf文件到{self.print_pdf_file_path}")
+        self._update_task_step("merged_all_pdf")
 
     def _prepare_base_dir(self):
         base_dir = os.path.join(
@@ -212,7 +222,7 @@ class PrintOrderThread(threading.Thread):
             picking_quantity = note["picking_quantity"]
             picking_unit_name = note["picking_unit_name"]
             picking_sku_name = note["picking_sku_name"]
-            note_list.append(f" * {picking_quantity} {picking_unit_name} {picking_sku_name}")
+            note_list.append(f" # {picking_quantity} {picking_unit_name} {picking_sku_name}")
         return note_list
 
     def _mark_all_order_printed(self):
@@ -225,3 +235,81 @@ class PrintOrderThread(threading.Thread):
                 self._save_task()
             except Exception as e:
                 self.log(e)
+        self._update_task_step("marked_all_order_printed")
+
+    def _update_task_step(self, step_id):
+        """
+
+        :param step_id:
+        :return:
+        """
+        all_steps = [
+            {
+                "id": "parsed_all_order_info",
+                "name": "解析订单信息, 开始从bigseller下载面单PDF"
+            },
+            {
+                "id": "downloaded_all_pdf",
+                "name": "从bigseller下载面单PDF完成，为订单增加拣货备注"
+            },
+            {
+                "id": "noted_all_pdf",
+                "name": "完成订单备注，接下来合并所有订单pdf"
+            },
+            {
+                "id": "merged_all_pdf",
+                "name": "完成合并所有订单pdf, 接下来在bigseller上标记订单已打印"
+            },
+            {
+                "id": "marked_all_order_printed",
+                "name": "完成订单标记[已打印],生成下载链接"
+            },
+            {
+                "id": "pdf_ready",
+                "name": "PDF文件已生成，请下载并打印"
+            },
+        ]
+        idx = 0
+        for step in all_steps:
+            idx += 1
+            if step["id"] == step_id:
+                self.task.current_step = step["name"]
+                self.task.progress = idx * 100 / len(all_steps)
+                self.log(f"打印任务 {self.task.task_id} 步骤更新到 {step_id} ({self.task.current_step})")
+                self._save_task(task)
+                return
+
+    def _split_and_note_pdf(self, origin_all_pdf_file, platform_order_no_list, picking_note_list):
+        """
+
+        :param origin_all_pdf_file:
+        :param platform_order_no_list:
+        :param picking_note_list:
+        :return:
+        """
+        # split all pdfs
+        reader = PdfReader(origin_all_pdf_file)
+        writer = PdfWriter()
+        idx = 0
+        for i in range(len(reader.pages)):
+            page = reader.pages[i]
+            page_text = page.extract_text()
+            order_no = platform_order_no_list[idx]
+            writer.add_page(page)
+            if page_text.find(f"Order No:{order_no}") >= 0:
+                origin_pdf_file = os.path.join(self.base_dir, f"split.{order_no}.origin.pdf")
+                writer.write(origin_pdf_file)
+                writer.close()
+                picking_notes = picking_note_list[idx]
+                noted_pdf_file = os.path.join(self.base_dir, f"split.{order_no}.noted.pdf")
+                self._add_note_to_pdf(origin_pdf_file, noted_pdf_file, picking_notes)
+                self.pdf_list.append(noted_pdf_file)
+                writer = PdfWriter()
+                idx += 1
+        writer.close()
+        if idx != len(platform_order_no_list) or len(self.pdf_list) != len(platform_order_no_list):
+            self.log(f"print task {self.task.task_id} _split_and_note_pdf 异常， 拆分pdf数和订单数不匹配")
+            append_log_to_task(self.task, "_split_and_note_pdf 异常， 拆分pdf数和订单数不匹配")
+            return False
+        self._update_task_step("noted_all_pdf")
+        return True

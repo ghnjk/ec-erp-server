@@ -83,6 +83,9 @@ def process_and_mark_pdf(merger, mark_order_dir, pdf_file_name):
     reader = PdfReader(origin_path)
     for i in range(len(reader.pages)):
         page = reader.pages[i]
+        print(f"page {i} text:")
+        print(page.extract_text())
+        print("----")
         original_width = page.mediabox[2]
         original_height = page.mediabox[3]
         new_height = original_height / 150.0 * 180.0
