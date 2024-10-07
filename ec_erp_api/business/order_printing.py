@@ -76,7 +76,7 @@ class PrintOrderThread(threading.Thread):
         platform = ""
         for order in self.task.order_list:
             order_id = order["id"]
-            order_id_list.append(order_id)
+            order_id_list.append(str(order_id))
             platform_order_no = order["platformOrderId"]
             platform_order_no_list.append(platform_order_no)
             platform = order["platform"]
