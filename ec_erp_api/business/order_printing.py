@@ -276,7 +276,7 @@ class PrintOrderThread(threading.Thread):
                 self.task.current_step = step["name"]
                 self.task.progress = idx * 100 / len(all_steps)
                 self.log(f"打印任务 {self.task.task_id} 步骤更新到 {step_id} ({self.task.current_step})")
-                self._save_task(task)
+                self._save_task()
                 return
 
     def _split_and_note_pdf(self, origin_all_pdf_file, platform_order_no_list, picking_note_list):
