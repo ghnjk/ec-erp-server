@@ -16,6 +16,7 @@ from ec_erp_api.app_config import get_app_config, get_static_dir
 from ec.bigseller.big_seller_client import BigSellerClient
 from ec_erp_api.models.mysql_backend import OrderPrintTask
 from PyPDF2 import PdfReader, PdfWriter, Transformation
+from PyPDF2.generic import FloatObject
 from reportlab.pdfgen import canvas
 import logging
 import traceback
@@ -146,7 +147,6 @@ class PrintOrderThread(threading.Thread):
         self.backend.store_order_print_task(self.task)
 
     def _add_note_to_pdf_with_merge_mode(self, cur_order_pages, picking_notes, merger):
-        from pypdf.generic import FloatObject
         for i in range(len(cur_order_pages)):
             page = cur_order_pages[i]
             original_width = page.mediabox[2]
@@ -176,7 +176,6 @@ class PrintOrderThread(threading.Thread):
         ]
         :return:
         """
-        from pypdf.generic import FloatObject
         reader = PdfReader(origin_pdf_file)
         writer = PdfWriter()
         for i in range(len(reader.pages)):
