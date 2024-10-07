@@ -118,6 +118,7 @@ class PrintOrderThread(threading.Thread):
             reader = PdfReader(pdf_file)
             for i in range(len(reader.pages)):
                 page = reader.pages[i]
+                page.compress_content_streams()
                 merger.add_page(page)
         merger.write(self.print_pdf_file_path)
         self.log(f"合并pdf文件到{self.print_pdf_file_path}")
