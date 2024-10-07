@@ -18,6 +18,7 @@ def create_app():
     from ec_erp_api.apis.supplier import supplier_apis
     from ec_erp_api.apis.warehouse import warehouse_apis
     set_file_logger("acc.log", logger=logging.getLogger("ACC"))
+    set_file_logger("async_task.log", logger=logging.getLogger("ASYNC_TASK"))
 
     app = Flask(app_config["application"], static_url_path='')
     app.static_folder = "./static"
