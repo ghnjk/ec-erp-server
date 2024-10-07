@@ -8,6 +8,7 @@
 import os
 import threading
 import json
+import time
 from datetime import datetime
 from ec_erp_api.models.mysql_backend import MysqlBackend
 from ec_erp_api.app_config import get_app_config, get_static_dir
@@ -73,7 +74,14 @@ class PrintOrderThread(threading.Thread):
             self.log(json.dumps(picking_notes, ensure_ascii=False))
             origin_pdf_file = os.path.join(self.base_dir, f"{mark_id}.origin.pdf")
             noted_pdf_file = os.path.join(self.base_dir, f"{mark_id}.noted.pdf")
-            self.client.download_order_mask_pdf_file(order_id, mark_id, platform, origin_pdf_file)
+            for i in range(4):
+                try:
+                    self.client.download_order_mask_pdf_file(order_id, mark_id, platform, origin_pdf_file)
+                    break
+                except Exception as e:
+                    time.sleep(1)
+                    self.log(f"下载异常{e}")
+                    self.logger.error(traceback.format_exc())
             if os.path.isfile(origin_pdf_file):
                 self.task.progress = idx * 100 / len(self.task.order_list)
                 append_log_to_task(self.task, f"download order {order_id} pdf success.")

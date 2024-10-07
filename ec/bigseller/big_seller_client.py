@@ -9,7 +9,7 @@ import json
 import os
 import time
 import typing
-
+import logging
 import requests
 from ec.verifycode.ydm_verify import YdmVerify
 
@@ -32,9 +32,11 @@ class BigSellerClient:
         self.session = requests.Session()
         self.auto_verify_coder = YdmVerify(ydm_token)
         self.cookies_file_path = cookies_file_path
+        self.logger = logging.getLogger("INVOKER")
 
     def login(self, email: str, encoded_password: str):
         if self.load_cookies() and self.is_login():
+            self.logger.info("use cookie login ok")
             print("use cookie login ok")
             return
         self.__login(email, encoded_password)
@@ -43,11 +45,11 @@ class BigSellerClient:
         # create new session
         self.session = requests.Session()
         # get login web
-        self.session.get(self.login_web_url)
+        self.get(self.login_web_url)
         # get verify code
         access_code, verify_code = self.get_valid_verify_code()
         print(f"access_code {access_code}, verify_code: {verify_code}")
-        response = self.session.post(self.login_url, {
+        response = self.post(self.login_url, {
             "email": email,
             "password": encoded_password,
             "verifyCode": str(verify_code),
@@ -59,17 +61,18 @@ class BigSellerClient:
         print(response.json())
         if self.is_login():
             print(f"login {email} success save cookies")
+            self.logger.info(f"login {email} success save cookies")
             self.save_cookies()
         else:
             raise Exception("login failed")
 
     def is_login(self):
-        response = self.session.get(self.check_login_url).json()
+        response = self.get(self.check_login_url).json()
         return response["data"]
 
     def get_valid_verify_code(self):
         for i in range(10):
-            response = self.session.get(self.gen_verify_code_url)
+            response = self.get(self.gen_verify_code_url)
             image_base64: str = response.json()["data"]["base64Image"]
             if image_base64.startswith("data:image/png;base64,"):
                 image_base64 = image_base64[len("data:image/png;base64,"):]
@@ -180,7 +183,8 @@ class BigSellerClient:
                 "inquireType": 0,
                 "saleStatus": 1
             }
-            res = self.session.post(self.query_sku_info_url, req).json()
+
+            res = self.post(self.query_sku_info_url, req).json()
             total_page = res["data"]["totalPage"]
             total_size = res["data"]["totalSize"]
             print(f"load page {page_no}/{total_page} data")
@@ -246,7 +250,7 @@ class BigSellerClient:
                 "desc": 0,
                 "categoryList": ""
             }
-            res = self.session.post(self.estimate_sku_url, req).json()
+            res = self.post(self.estimate_sku_url, req).json()
             total_page = res["data"]["totalPage"]
             total_size = res["data"]["totalSize"]
             print(f"load page {page_no}/{total_page} data")
@@ -259,7 +263,7 @@ class BigSellerClient:
         return rows
 
     def load_all_sku_classes(self):
-        res = self.session.post(self.query_all_sku_class_url, {}).json()
+        res = self.post(self.query_all_sku_class_url, {}).json()
         self.save_cookies()
         return res["data"]
 
@@ -271,7 +275,7 @@ class BigSellerClient:
         :return:
         """
         url = f"{self.query_sku_detail_url}?isGroup={is_group}&skuId={sku_id}"
-        res = self.session.get(url).json()
+        res = self.get(url).json()
         self.save_cookies()
         if res["code"] != 0:
             print(f"query_sku_detail sku id {sku_id} failed.")
@@ -316,7 +320,7 @@ class BigSellerClient:
           "error": ""
         }
         """
-        res = self.session.post(self.add_stock_url, json=req).json()
+        res = self.post(self.add_stock_url, json=req).json()
         self.save_cookies()
         if res["code"] != 0:
             raise Exception("add_stock_to_erp failed: http response msg: " + res["msg"])
@@ -347,7 +351,7 @@ class BigSellerClient:
                 }
             ]
         """
-        res = self.session.get(self.query_shop_group_url).json()
+        res = self.get(self.query_shop_group_url).json()
         self.save_cookies()
         if res["code"] != 0:
             print(f"query_shop_group sku failed.")
@@ -389,7 +393,7 @@ class BigSellerClient:
         """
         url = f"{self.query_shop_sell_static_url}?platform=&queryType=day" \
               f"&beginDate={begin_date}&endDate={end_date}&type=store&shopIds="
-        res = self.session.get(url).json()
+        res = self.get(url).json()
         self.save_cookies()
         if res["code"] != 0:
             print(f"query_shop_sell_static sku failed.")
@@ -415,7 +419,7 @@ class BigSellerClient:
               }
             ]
         """
-        res = self.session.get(self.query_shop_info_url).json()
+        res = self.get(self.query_shop_info_url).json()
         self.save_cookies()
         if res["code"] != 0:
             print(f"query_all_shop_info failed.")
@@ -459,7 +463,7 @@ class BigSellerClient:
             }]
         """
         url = f"https://www.bigseller.com/api/v1/inventory/merchant/getMoreSkuMapping.json?skuId={sku_id}"
-        res = self.session.get(url).json()
+        res = self.get(url).json()
         if res["code"] != 0:
             print(f"query_all_shop_info failed.")
             print(json.dumps(res, indent=2))
@@ -509,8 +513,8 @@ class BigSellerClient:
                 "beginReturnDate": refund_date,
                 "endReturnDate": refund_date
             }
-            res = self.session.post("https://www.bigseller.com/api/v1/order/refund/before/pageList.json",
-                                    json=req).json()
+            res = self.post("https://www.bigseller.com/api/v1/order/refund/before/pageList.json",
+                            json=req).json()
             total_page = res["data"]["page"]["totalPage"]
             total_size = res["data"]["page"]["totalSize"]
             print(f"load page {page_no}/{total_page} data")
@@ -626,7 +630,7 @@ class BigSellerClient:
             "warehouseId": str(warehouse_id),
             "zoneId": ""
         }
-        res = self.session.post(url, req).json()
+        res = self.post(url, req).json()
         if res["code"] != 0:
             print(f"query_refund_order_info_by_tracking_no failed.")
             print(json.dumps(res, indent=2))
@@ -647,18 +651,20 @@ class BigSellerClient:
             "isScan": 1,
             "orderInfoList": [refund_order]
         }
-        res = self.session.post(url, json=req).json()
+        res = self.post(url, json=req).json()
         self.save_cookies()
         if res["code"] != 0:
             raise Exception("return_refund_order_to_warehouse failed: http response msg: " + res["msg"])
         return res["data"]
 
     def download(self, url, file_path):
+        self.logger.info(f"DOWNLOAD url {url}...")
         r = self.session.get(url, stream=True)
         chunk_size = 4086
         with open(file_path, 'wb') as fd:
             for chunk in r.iter_content(chunk_size):
                 fd.write(chunk)
+        self.logger.info(f"DOWNLOAD url {url} ok.")
 
     def get_wait_print_order_ship_provider_list(self):
         """
@@ -756,7 +762,7 @@ class BigSellerClient:
             "waveSearchType": None,
             "orderConditionId": ""
         }
-        res = self.session.post(url, json=req).json()
+        res = self.post(url, json=req).json()
         if res["code"] != 0:
             print(f"get_order_status_count failed.")
             print(json.dumps(res, indent=2, ensure_ascii=False))
@@ -1086,7 +1092,7 @@ class BigSellerClient:
             "pageNo": current_page,
             "pageSize": page_size
         }
-        res = self.session.post(url, json=req).json()
+        res = self.post(url, json=req).json()
         if res["code"] != 0:
             print(f"search_wait_print_order failed.")
             print(json.dumps(res, indent=2))
@@ -1115,11 +1121,11 @@ class BigSellerClient:
             "mark": mark_id,
             "isLazada": is_lazada
         }
-        self.session.post(url, req)
+        self.post(url, req)
         for i in range(1000):
             time.sleep(1)
             url = f"https://www.bigseller.com/api/v1/print/print/getOrderPrintProgress.json?mark={mark_id}&type=lable"
-            res = self.session.get(url).json()
+            res = self.get(url).json()
             file_url = res.get("data", {}).get("fileUrl")
             if file_url is not None and file_url != "":
                 break
@@ -1417,7 +1423,7 @@ class BigSellerClient:
             }
         """
         url = f"https://www.bigseller.com/api/v1/order/detail.json?id={order_id}&viewBuyerMessage=false"
-        res = self.session.get(url).json()
+        res = self.get(url).json()
         if res["code"] != 0:
             print(f"get_order_detail failed.")
             print(json.dumps(res, indent=2))
@@ -1435,8 +1441,28 @@ class BigSellerClient:
             "orderIds": order_id,
             "markType": "auto"
         }
-        res = self.session.post(url, req)
+        res = self.post(url, req)
         if res.status_code != 200:
             time.sleep(0.5)
-            res = self.session.post(url, req)
+            res = self.post(url, req)
         print(f"mark_order_printed {order_id} result {res.text}")
+
+    def post(self, url: str, data=None, json_obj=None):
+        if data is not None:
+            req_text = json.dumps(data, ensure_ascii=False)[: 128]
+        else:
+            req_text = json.dumps(json_obj, ensure_ascii=False)[: 128]
+        self.logger.info(f"POST REQUEST {url} req_text: {req_text} ...")
+        res = self.session.post(url, data=data, json=json_obj)
+        res_code = res.status_code
+        res_text = res.text[:128]
+        self.logger.info(f"POST RESPONSE {url} http_code: {res_code} res_text: {res_text}")
+        return res
+
+    def get(self, url: str):
+        self.logger.info(f"GET REQUEST {url}")
+        res = self.session.get(url)
+        res_code = res.status_code
+        res_text = res.text[:128]
+        self.logger.info(f"GET RESPONSE {url} http_code: {res_code} res_text: {res_text}")
+        return res
