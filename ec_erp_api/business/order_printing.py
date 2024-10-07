@@ -139,6 +139,11 @@ class PrintOrderThread(threading.Thread):
         self.base_dir = base_dir
         self.print_pdf_file_path = os.path.join(base_dir, f"{self.task.task_id}.all.pdf")
         self.print_pdf_url = f"/print/{self.task.task_id}/{self.task.task_id}.all.pdf"
+        for item in self.task.order_list:
+            order_no = item["platformOrderId"]
+            order_info_file = os.path.join(self.base_dir, f"split.{order_no}.order.json")
+            with open(order_info_file, "w") as fp:
+                json.dump(item, fp, indent=2, ensure_ascii=False)
         return base_dir
 
     def _save_task(self):
@@ -310,6 +315,9 @@ class PrintOrderThread(threading.Thread):
                 writer.close()
                 picking_notes = picking_note_list[idx]
                 noted_pdf_file = os.path.join(self.base_dir, f"split.{order_no}.noted.pdf")
+                picking_note_file = os.path.join(self.base_dir, f"split.{order_no}.noted.json")
+                with open(picking_note_file, "w") as fp:
+                    json.dump(picking_notes, fp, indent=2, ensure_ascii=False)
                 self._add_note_to_pdf(origin_pdf_file, noted_pdf_file, picking_notes)
                 self.pdf_list.append(noted_pdf_file)
                 writer = PdfWriter()
