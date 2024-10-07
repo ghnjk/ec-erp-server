@@ -213,10 +213,21 @@ def search_manual_mark_sku_picking_note():
     if not request_context.validate_user_permission(request_context.PMS_WAREHOUSE):
         return response_util.pack_error_response(1008, "权限不足")
     current_page = request_util.get_int_param("current_page")
+    sku_manager = big_seller_util.build_sku_manager()
     page_size = request_util.get_int_param("page_size")
     offset = (current_page - 1) * page_size
     total, records = request_context.get_backend().search_sku_picking_note(offset, page_size)
-    return response_util.pack_pagination_result(total, records)
+    res_list = []
+    for r in records:
+        item = DtoUtil.to_dict(r)
+        sku_info = sku_manager.sku_map.get(r.sku)
+        item["erp_sku_image_url"] = sku_info["imgUrl"]
+        item["erp_sku_name"] = sku_info["title"]
+        res_list.append(item)
+    return response_util.pack_json_response({
+        "total": total,
+        "list": res_list
+    })
 
 
 @warehouse_apis.route('/submit_manual_mark_sku_picking_note', methods=["POST"])
