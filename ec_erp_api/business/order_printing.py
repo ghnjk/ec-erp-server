@@ -49,10 +49,11 @@ class PrintOrderThread(threading.Thread):
         self.log(f"print-task thread {threading.current_thread()} start exec task {self.task.task_id}...")
         self._prepare_base_dir()
         try:
+            merger = PdfWriter()
             # 下载所有的PDF
-            if self._download_all_order_pdf():
+            if self._download_all_order_pdf(merger):
                 # 合成PDF
-                self._gen_merge_pdf()
+                self._gen_merge_pdf(merger)
                 # 添加所有打单编辑
                 self._mark_all_order_printed()
                 # 设置下载地址
@@ -68,7 +69,7 @@ class PrintOrderThread(threading.Thread):
             append_log_to_task(self.task, traceback.format_exc())
             self._save_task()
 
-    def _download_all_order_pdf(self):
+    def _download_all_order_pdf(self, merger: PdfWriter):
         order_id_list = []
         platform_order_no_list = []
         picking_note_list = []
@@ -97,7 +98,7 @@ class PrintOrderThread(threading.Thread):
                 self.logger.error(traceback.format_exc())
         self._update_task_step("downloaded_all_pdf")
         if os.path.isfile(origin_all_pdf_file):
-            return self._split_and_note_pdf(origin_all_pdf_file, platform_order_no_list, picking_note_list)
+            return self._split_and_note_pdf(origin_all_pdf_file, platform_order_no_list, picking_note_list, merger)
         else:
             self.task.current_step = "从bigseller下载pdf异常。"
             append_log_to_task(self.task, f"download origin_all_pdf_file pdf failed.")
@@ -112,14 +113,14 @@ class PrintOrderThread(threading.Thread):
         formatted_now = now.strftime("%Y-%m-%d %H:%M:%S")
         self.logger.info(f"{formatted_now} ASYNC_TASK >> {self.task.task_id} >> - {msg}")
 
-    def _gen_merge_pdf(self):
-        merger = PdfWriter()
-        for pdf_file in self.pdf_list:
-            reader = PdfReader(pdf_file)
-            for i in range(len(reader.pages)):
-                page = reader.pages[i]
-                page.compress_content_streams()
-                merger.add_page(page)
+    def _gen_merge_pdf(self, merger: PdfWriter):
+        # merger = PdfWriter()
+        # for pdf_file in self.pdf_list:
+        #     reader = PdfReader(pdf_file)
+        #     for i in range(len(reader.pages)):
+        #         page = reader.pages[i]
+        #         page.compress_content_streams()
+        #         merger.add_page(page)
         merger.write(self.print_pdf_file_path)
         self.log(f"合并pdf文件到{self.print_pdf_file_path}")
         append_log_to_task(self.task, f"合并pdf文件到{self.print_pdf_file_path}")
@@ -143,6 +144,21 @@ class PrintOrderThread(threading.Thread):
 
     def _save_task(self):
         self.backend.store_order_print_task(self.task)
+
+    def _add_note_to_pdf_with_merge_mode(self, cur_order_pages, picking_notes, merger):
+        for i in range(len(cur_order_pages)):
+            page = cur_order_pages[i]
+            original_width = page.mediabox[2]
+            original_height = page.mediabox[3]
+            new_height = original_height / 150.0 * 180.0
+            transfer_y = new_height - original_height
+            page.mediabox.upper_right = (original_width, new_height)
+            page.add_transformation(Transformation().translate(0, transfer_y))
+            if i == len(cur_order_pages) - 1:
+                # last page
+                self._add_mark_to_page(page, original_width, original_height, new_height, picking_notes)
+            page.compress_content_streams()
+            merger.add_page(page)
 
     def _add_note_to_pdf(self, origin_pdf_file: str, noted_pdf_file: str, picking_notes: dict):
         """
@@ -283,7 +299,7 @@ class PrintOrderThread(threading.Thread):
                 self._save_task()
                 return
 
-    def _split_and_note_pdf(self, origin_all_pdf_file, platform_order_no_list, picking_note_list):
+    def _split_and_note_pdf(self, origin_all_pdf_file, platform_order_no_list, picking_note_list, merger: PdfWriter):
         """
 
         :param origin_all_pdf_file:
@@ -295,11 +311,13 @@ class PrintOrderThread(threading.Thread):
         reader = PdfReader(origin_all_pdf_file)
         writer = PdfWriter()
         idx = 0
+        cur_order_pages = []
         for i in range(len(reader.pages)):
             page = reader.pages[i]
             page_text = page.extract_text()
             order_no = platform_order_no_list[idx]
             writer.add_page(page)
+            cur_order_pages.append(page)
             if page_text.find(f"Order No:{order_no}") >= 0:
                 origin_pdf_file = os.path.join(self.base_dir, f"split.{order_no}.origin.pdf")
                 writer.write(origin_pdf_file)
@@ -307,10 +325,14 @@ class PrintOrderThread(threading.Thread):
                 picking_notes = picking_note_list[idx]
                 noted_pdf_file = os.path.join(self.base_dir, f"split.{order_no}.noted.pdf")
                 self._add_note_to_pdf(origin_pdf_file, noted_pdf_file, picking_notes)
+                self._add_note_to_pdf_with_merge_mode(
+                    cur_order_pages, picking_notes, merger
+                )
                 self.pdf_list.append(noted_pdf_file)
                 writer = PdfWriter()
                 idx += 1
         writer.close()
+        merger.add_metadata(reader.metadata)
         if idx != len(platform_order_no_list) or len(self.pdf_list) != len(platform_order_no_list):
             self.log(f"print task {self.task.task_id} _split_and_note_pdf 异常， 拆分pdf数和订单数不匹配")
             append_log_to_task(self.task, "_split_and_note_pdf 异常， 拆分pdf数和订单数不匹配")
