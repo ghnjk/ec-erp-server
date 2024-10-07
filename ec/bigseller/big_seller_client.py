@@ -1122,14 +1122,19 @@ class BigSellerClient:
             "isLazada": is_lazada
         }
         self.post(url, req)
+        file_url = ""
         for i in range(1000):
-            time.sleep(1)
-            url = f"https://www.bigseller.com/api/v1/print/print/getOrderPrintProgress.json?mark={mark_id}&type=lable"
-            res = self.get(url).json()
-            file_url = res.get("data", {}).get("fileUrl")
-            if file_url is not None and file_url != "":
-                break
-        self.download(file_url, save_pdf_file)
+            try:
+                time.sleep(1)
+                url = f"https://www.bigseller.com/api/v1/print/print/getOrderPrintProgress.json?mark={mark_id}&type=lable"
+                res = self.get(url, timeout=30).json()
+                file_url = res.get("data", {}).get("fileUrl")
+                if file_url is not None and file_url != "":
+                    break
+            except Exception as e:
+                self.logger.error(e)
+        if file_url != "":
+            self.download(file_url, save_pdf_file)
 
     def get_order_detail(self, order_id: int):
         """
@@ -1441,28 +1446,35 @@ class BigSellerClient:
             "orderIds": order_id,
             "markType": "auto"
         }
-        res = self.post(url, req)
+        res = self.post(url, req, timeout=30)
         if res.status_code != 200:
             time.sleep(0.5)
-            res = self.post(url, req)
+            res = self.post(url, req, timeout=30)
         print(f"mark_order_printed {order_id} result {res.text}")
+        return res.json()
 
-    def post(self, url: str, data=None, json=None):
+    def post(self, url: str, data=None, json=None, timeout=None):
         import json as js
         if data is not None:
             req_text = js.dumps(data, ensure_ascii=False)[: 128]
         else:
             req_text = js.dumps(json, ensure_ascii=False)[: 128]
         self.logger.info(f"POST REQUEST {url} req_text: {req_text} ...")
-        res = self.session.post(url, data=data, json=json)
+        if timeout is not None:
+            res = self.session.post(url, data=data, json=json, timeout=timeout)
+        else:
+            res = self.session.post(url, data=data, json=json)
         res_code = res.status_code
         res_text = res.text[:128]
         self.logger.info(f"POST RESPONSE {url} http_code: {res_code} res_text: {res_text}")
         return res
 
-    def get(self, url: str):
+    def get(self, url: str, timeout=None):
         self.logger.info(f"GET REQUEST {url}")
-        res = self.session.get(url)
+        if timeout is not None:
+            res = self.session.get(url, timeout=timeout)
+        else:
+            res = self.session.get(url)
         res_code = res.status_code
         res_text = res.text[:128]
         self.logger.info(f"GET RESPONSE {url} http_code: {res_code} res_text: {res_text}")
