@@ -15,6 +15,8 @@ from ec.bigseller.big_seller_client import BigSellerClient
 from ec_erp_api.models.mysql_backend import OrderPrintTask
 from PyPDF2 import PdfReader, PdfWriter, Transformation
 from reportlab.pdfgen import canvas
+import logging
+import traceback
 
 
 def append_log_to_task(task: OrderPrintTask, log: str):
@@ -39,20 +41,25 @@ class PrintOrderThread(threading.Thread):
         self.base_dir = ""
         self.print_pdf_file_path = ""
         self.print_pdf_url = ""
+        self.logger = logging.getLogger("ASYNC_TASK")
 
     def run(self):
         self.log(f"print-task thread {threading.current_thread()} start exec task {self.task.task_id}...")
         self._prepare_base_dir()
-        # 下载所有的PDF
-        if self._download_all_order_pdf():
-            # 合成PDF
-            self._gen_merge_pdf()
-            # 添加所有打单编辑
-            self._mark_all_order_printed()
-            # 设置下载地址
-            self.task.current_step = "PDF已生成，请下载并打印"
-            self.task.pdf_file_url = self.print_pdf_url
-            self._save_task()
+        try:
+            # 下载所有的PDF
+            if self._download_all_order_pdf():
+                # 合成PDF
+                self._gen_merge_pdf()
+                # 添加所有打单编辑
+                self._mark_all_order_printed()
+                # 设置下载地址
+                self.task.current_step = "PDF已生成，请下载并打印"
+                self.task.pdf_file_url = self.print_pdf_url
+                self._save_task()
+        except Exception as e:
+            self.log(f"EXCEPTION {self.task.task_id} process async task error: {e}")
+            self.logger.error(traceback.format_exc())
 
     def _download_all_order_pdf(self):
         idx = 0
@@ -86,7 +93,7 @@ class PrintOrderThread(threading.Thread):
         now = datetime.now()
         # 格式化日期和时间
         formatted_now = now.strftime("%Y-%m-%d %H:%M:%S")
-        print(f"{formatted_now} ASYNC_TASK >> {self.task.task_id} >> - {msg}")
+        self.logger.info(f"{formatted_now} ASYNC_TASK >> {self.task.task_id} >> - {msg}")
 
     def _gen_merge_pdf(self):
         merger = PdfWriter()
