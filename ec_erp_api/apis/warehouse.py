@@ -82,7 +82,7 @@ class OrderAnalysis(object):
             counter = OrderSkuCounter()
             picking_notes = []
             order_id = order["id"]
-            platform_order_no = order["platfromOrderId"]
+            platform_order_no = order["platformOrderId"]
             # 直接查询erp的订单详情的sku匹配结果
             detail = self.client.get_order_detail(order_id)
             sku_match_detail = []
