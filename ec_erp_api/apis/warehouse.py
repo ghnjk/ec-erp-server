@@ -105,7 +105,7 @@ class OrderAnalysis(object):
                 })
                 if var_sku_group_list is None or len(var_sku_group_list) == 0:
                     # 单1sku
-                    sku_info = self.sku_manager.sku_map[inventory_sku]
+                    sku_info = self.sku_manager.sku_map.get(inventory_sku, {})
                     self.sku_sample_desc[inventory_sku] = self._build_sample_desc(
                         inventory_sku, allocated, inventory_sku, allocated
                     )
@@ -115,7 +115,7 @@ class OrderAnalysis(object):
                     for var_item in var_sku_group_list:
                         item_sku = var_item["varSku"]
                         item_num = var_item["num"]
-                        sku_info = self.sku_manager.sku_map[item_sku]
+                        sku_info = self.sku_manager.sku_map.get(item_sku, {})
                         self.sku_sample_desc[item_sku] = self._build_sample_desc(
                             inventory_sku, allocated, item_sku, allocated * item_num
                         )
@@ -178,8 +178,7 @@ class OrderAnalysis(object):
 
     def _add_need_note_sku(self, unit_sku):
         sku = unit_sku["sku"]
-        sku_info = unit_sku["sku_info"]
-        image_url = sku_info["imgUrl"]
+        image_url = unit_sku["sku_info"].get("imgUrl")
         if sku not in self.need_manual_mark_sku_keys:
             self.need_manual_mark_sku_keys.add(sku)
             self.need_manual_mark_sku_list.append({
