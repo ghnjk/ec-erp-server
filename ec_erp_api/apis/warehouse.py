@@ -112,7 +112,7 @@ class OrderAnalysis(object):
                     counter.add(inventory_sku, allocated, sku_info)
                 else:
                     # 组合sku
-                    for var_item in var_sku_group_list["sku_group_items"]:
+                    for var_item in var_sku_group_list:
                         item_sku = var_item["varSku"]
                         item_num = var_item["num"]
                         sku_info = self.sku_manager.sku_map[item_sku]
