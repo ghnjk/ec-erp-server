@@ -259,8 +259,12 @@ def search_manual_mark_sku_picking_note():
     for r in records:
         item = DtoUtil.to_dict(r)
         sku_info = sku_manager.sku_map.get(r.sku)
-        item["erp_sku_image_url"] = sku_info["imgUrl"]
-        item["erp_sku_name"] = sku_info["title"]
+        if item is not None:
+            item["erp_sku_image_url"] = sku_info["imgUrl"]
+            item["erp_sku_name"] = sku_info["title"]
+        else:
+            item["erp_sku_image_url"] = ""
+            item["erp_sku_name"] = ""
         res_list.append(item)
     return response_util.pack_json_response({
         "total": total,
