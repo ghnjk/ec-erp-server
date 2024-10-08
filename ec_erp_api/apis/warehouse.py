@@ -82,32 +82,71 @@ class OrderAnalysis(object):
             counter = OrderSkuCounter()
             picking_notes = []
             order_id = order["id"]
-            # 匹配所有sku，转成单一的sku并合并
-            for item in order["orderItemList"]:
+            platform_order_no = order["platfromOrderId"]
+            # 直接查询erp的订单详情的sku匹配结果
+            detail = self.client.get_order_detail(order_id)
+            sku_match_detail = []
+            for item in detail["orderItemVoList"]:
+                allocated = item["allocated"]
+                allocating = item["allocating"]
+                if allocated != allocating:
+                    raise Exception(f"order {platform_order_no} sku 匹配信息异常")
+                # 店铺上的sku
                 var_sku = item["varSku"]
-                quantity = item["quantity"]
-                sku_name = self.sku_manager.get_sku_name_by_shop_sku(shop_id, var_sku)
-                if sku_name == "UNKNOWN":
-                    sku_name = self._try_find_sku_name_by_order_id(order_id, var_sku)
-                if sku_name == "UNKNOWN":
-                    print(f"商品信息匹配失败. shop id {shop_id} var_sku {var_sku}")
-                    raise Exception(f"商品信息匹配失败. shop id {shop_id} var_sku {var_sku}")
-                sku_group_attr = self.sku_manager.get_sku_group_attr(sku_name)
-                if sku_group_attr["is_group"] == 0:
-                    sku_info = self.sku_manager.sku_map[sku_name]
-                    self.sku_sample_desc[sku_name] = self._build_sample_desc(
-                        sku_name, quantity, sku_name, quantity
+                # 平台匹配的sku
+                inventory_sku = item["inventorySku"]
+                # 平台匹配组合sku信息 单一sku时，为null
+                var_sku_group_list = item.get("varSkuGroupVoList", None)
+                sku_match_detail.append({
+                    "var_sku": var_sku,
+                    "inventory_sku": inventory_sku,
+                    "var_sku_group_list": var_sku_group_list,
+                    "allocated": allocated
+                })
+                if var_sku_group_list is None or len(var_sku_group_list) == 0:
+                    # 单1sku
+                    sku_info = self.sku_manager.sku_map[inventory_sku]
+                    self.sku_sample_desc[inventory_sku] = self._build_sample_desc(
+                        inventory_sku, allocated, inventory_sku, allocated
                     )
-                    counter.add(sku_name, quantity, sku_info)
+                    counter.add(inventory_sku, allocated, sku_info)
                 else:
-                    for var_item in sku_group_attr["sku_group_items"]:
+                    # 组合sku
+                    for var_item in var_sku_group_list["sku_group_items"]:
                         item_sku = var_item["varSku"]
                         item_num = var_item["num"]
                         sku_info = self.sku_manager.sku_map[item_sku]
                         self.sku_sample_desc[item_sku] = self._build_sample_desc(
-                            sku_name, quantity, item_sku, quantity * item_num
+                            inventory_sku, allocated, item_sku, allocated * item_num
                         )
-                        counter.add(item_sku, quantity * item_num, sku_info)
+                        counter.add(item_sku, allocated * item_num, sku_info)
+            order["sku_match_detail"] = sku_match_detail
+            # # 匹配所有sku，转成单一的sku并合并
+            # for item in order["orderItemList"]:
+            #     var_sku = item["varSku"]
+            #     quantity = item["quantity"]
+            #     sku_name = self.sku_manager.get_sku_name_by_shop_sku(shop_id, var_sku)
+            #     if sku_name == "UNKNOWN":
+            #         sku_name = self._try_find_sku_name_by_order_id(order_id, var_sku)
+            #     if sku_name == "UNKNOWN":
+            #         print(f"商品信息匹配失败. shop id {shop_id} var_sku {var_sku}")
+            #         raise Exception(f"商品信息匹配失败. shop id {shop_id} var_sku {var_sku}")
+            #     sku_group_attr = self.sku_manager.get_sku_group_attr(sku_name)
+            #     if sku_group_attr["is_group"] == 0:
+            #         sku_info = self.sku_manager.sku_map[sku_name]
+            #         self.sku_sample_desc[sku_name] = self._build_sample_desc(
+            #             sku_name, quantity, sku_name, quantity
+            #         )
+            #         counter.add(sku_name, quantity, sku_info)
+            #     else:
+            #         for var_item in sku_group_attr["sku_group_items"]:
+            #             item_sku = var_item["varSku"]
+            #             item_num = var_item["num"]
+            #             sku_info = self.sku_manager.sku_map[item_sku]
+            #             self.sku_sample_desc[item_sku] = self._build_sample_desc(
+            #                 sku_name, quantity, item_sku, quantity * item_num
+            #             )
+            #             counter.add(item_sku, quantity * item_num, sku_info)
             # 添加拣货备注
             for key in counter.all_unit_skus.keys():
                 unit_sku = counter.all_unit_skus[key]

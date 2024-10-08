@@ -142,8 +142,11 @@ class PrintOrderThread(threading.Thread):
         for item in self.task.order_list:
             order_no = item["platformOrderId"]
             order_info_file = os.path.join(self.base_dir, f"split.{order_no}.order.json")
+            sku_match_info_file = os.path.join(self.base_dir, f"split.{order_no}.sku.match.json")
             with open(order_info_file, "w") as fp:
                 json.dump(item, fp, indent=2, ensure_ascii=False)
+            with open(sku_match_info_file, "w") as fp:
+                json.dump(item["sku_match_detail"], fp, indent=2, ensure_ascii=False)
         return base_dir
 
     def _save_task(self):
