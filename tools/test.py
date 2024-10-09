@@ -83,6 +83,7 @@ def process_and_mark_pdf(merger, mark_order_dir, pdf_file_name):
     reader = PdfReader(origin_path)
     for i in range(len(reader.pages)):
         page = reader.pages[i]
+        print(page.mediabox)
         print(f"page {i} text:")
         print(page.extract_text())
         print("----")

@@ -304,6 +304,7 @@ class PrintOrderThread(threading.Thread):
         # split all pdfs
         reader = PdfReader(origin_all_pdf_file)
         writer = PdfWriter()
+        all_writer = PdfWriter()
         idx = 0
         cur_order_pages = []
         for i in range(len(reader.pages)):
@@ -325,7 +326,21 @@ class PrintOrderThread(threading.Thread):
                 self.pdf_list.append(noted_pdf_file)
                 writer = PdfWriter()
                 idx += 1
+            ### todo: test
+            original_width = 282.0
+            original_height = 423.0
+            new_height = original_height / 150.0 * 180.0
+            transfer_y = new_height - original_height
+            page.mediabox.upper_right = (original_width, new_height)
+            page.add_transformation(Transformation().translate(0, transfer_y))
+            if page_text.find(f"Order No:{order_no}") >= 0:
+                # last page
+                picking_notes = picking_note_list[idx - 1]
+                self._add_mark_to_page(page, original_width, original_height, new_height, picking_notes)
+            all_writer.add_page(page)
         writer.close()
+        all_writer.add_metadata(reader.metadata)
+        all_writer.write(origin_all_pdf_file + ".tmp.pdf")
         if idx != len(platform_order_no_list) or len(self.pdf_list) != len(platform_order_no_list):
             self.log(f"print task {self.task.task_id} _split_and_note_pdf 异常， 拆分pdf数和订单数不匹配")
             append_log_to_task(self.task, "_split_and_note_pdf 异常， 拆分pdf数和订单数不匹配")
