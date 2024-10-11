@@ -22,6 +22,7 @@ from ec_erp_api.common import codec_util
 
 func_declarative_base = declarative_base
 DtoBase = sqlalchemy.orm.declarative_base()
+logger = logging.getLogger("sqlalchemy.engine")
 
 
 class DtoUtil(object):
@@ -440,7 +441,7 @@ class MysqlBackend(object):
         """
 
     def __init__(self, project_id: str, host: str, port: int,
-                 user: str, password: str, db_name: str = "ec_erp_db") -> None:
+                 user: str, password: str, db_name: str = "ec_erp_db", echo_stdout=True) -> None:
         """
 
         :param project_id: 项目id， 如果为None或者空，则只能查询非项目私有资源
@@ -454,11 +455,11 @@ class MysqlBackend(object):
         port = int(port)
 
         self.db_engine = create_engine(f"mysql+pymysql://{user}:{password}@{host}:{port}/{db_name}?charset=utf8",
-                                       echo=True)
+                                       echo=echo_stdout)
         self.check_db_engine = create_engine(f"mysql+pymysql://{user}:{password}@{host}:{port}?charset=utf8",
-                                             echo=True)
+                                             echo=echo_stdout)
 
-        self.check_db_engine.logger = logging.getLogger("sqlalchemy")
+        # self.check_db_engine.logger = logging.getLogger("sqlalchemy")
         self.db_name = db_name
         self.DBSession = sessionmaker(bind=self.db_engine)
 
@@ -480,7 +481,7 @@ class MysqlBackend(object):
             # Create database if not exists
             if self.db_name not in existing_databases:
                 con.execute(text("CREATE DATABASE {0}".format(self.db_name)))
-                logging.info("Created database {0}".format(self.db_engine))
+                logger.info("Created database {0}".format(self.db_engine))
         # init all tables
         DtoBase.metadata.create_all(self.db_engine)
 
@@ -525,8 +526,8 @@ class MysqlBackend(object):
         except Exception as e:
             session.rollback()
             session.close()
-            logging.error(f"store project project_id {project_id}"
-                          f"  failed: {e}")
+            logger.error(f"store project project_id {project_id}"
+                         f"  failed: {e}")
             raise
 
     @staticmethod
@@ -565,8 +566,8 @@ class MysqlBackend(object):
         except Exception as e:
             session.rollback()
             session.close()
-            logging.error(f"store user user_name {user.user_name}"
-                          f"  failed: {e}")
+            logger.error(f"store user user_name {user.user_name}"
+                         f"  failed: {e}")
             raise
 
     def get_user(self, user_name: str) -> typing.Optional[UserDto]:
@@ -578,8 +579,8 @@ class MysqlBackend(object):
             return db_dto
         except Exception as e:
             session.close()
-            logging.error(f"get user user_name {user_name}"
-                          f"  failed: {e}")
+            logger.error(f"get user user_name {user_name}"
+                         f"  failed: {e}")
             raise
 
     @staticmethod
@@ -617,8 +618,8 @@ class MysqlBackend(object):
         except Exception as e:
             session.rollback()
             session.close()
-            logging.error(f"store user user_name {supplier.supplier_name}"
-                          f"  failed: {e}")
+            logger.error(f"store user user_name {supplier.supplier_name}"
+                         f"  failed: {e}")
             raise
 
     def search_suppliers(self, offset: int, limit: int) -> typing.Tuple[int, typing.List[SupplierDto]]:
@@ -663,8 +664,8 @@ class MysqlBackend(object):
         except Exception as e:
             session.rollback()
             session.close()
-            logging.error(f"store sku sku {sku.sku}"
-                          f"  failed: {e}")
+            logger.error(f"store sku sku {sku.sku}"
+                         f"  failed: {e}")
             raise
 
     def search_sku(self,
@@ -734,8 +735,8 @@ class MysqlBackend(object):
         except Exception as e:
             session.rollback()
             session.close()
-            logging.error(f"store sku_purchase sku {sku_purchase.sku}"
-                          f"  failed: {e}")
+            logger.error(f"store sku_purchase sku {sku_purchase.sku}"
+                         f"  failed: {e}")
             raise
 
     def search_sku_purchase_price(self, offset, limit) -> typing.Tuple[int, typing.List[SkuPurchasePriceDto]]:
@@ -787,8 +788,8 @@ class MysqlBackend(object):
         except Exception as e:
             session.rollback()
             session.close()
-            logging.error(f"store purchase_order order_id {purchase_order.purchase_order_id}"
-                          f"  failed: {e}")
+            logger.error(f"store purchase_order order_id {purchase_order.purchase_order_id}"
+                         f"  failed: {e}")
             raise
 
     def load_shipping_purchase_order(self) -> typing.List[PurchaseOrder]:
@@ -876,8 +877,8 @@ class MysqlBackend(object):
         except Exception as e:
             session.rollback()
             session.close()
-            logging.error(f"store SkuSaleEstimateDto sku {est.sku} order_date {est.order_date} shop_id {est.shop_id} "
-                          f"  failed: {e}")
+            logger.error(f"store SkuSaleEstimateDto sku {est.sku} order_date {est.order_date} shop_id {est.shop_id} "
+                         f"  failed: {e}")
             raise
 
     def search_sku_sale_estimate(self, begin_date, end_date, sku) -> typing.List[SkuSaleEstimateDto]:
@@ -957,8 +958,8 @@ class MysqlBackend(object):
         except Exception as e:
             session.rollback()
             session.close()
-            logging.error(f"store SkuPickingNote sku {note.sku}"
-                          f"  failed: {e}")
+            logger.error(f"store SkuPickingNote sku {note.sku}"
+                         f"  failed: {e}")
             raise
 
     def get_order_print_task(self, task_id: str) -> typing.Optional[OrderPrintTask]:
@@ -1003,8 +1004,8 @@ class MysqlBackend(object):
         except Exception as e:
             session.rollback()
             session.close()
-            logging.error(f"store OrderPrintTask sku {note.sku}"
-                          f"  failed: {e}")
+            logger.error(f"store OrderPrintTask sku {note.sku}"
+                         f"  failed: {e}")
             raise
 
 

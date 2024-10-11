@@ -20,6 +20,7 @@ def create_app():
     set_file_logger("acc.log", logger=logging.getLogger("ACC"))
     set_file_logger("async_task.log", logger=logging.getLogger("ASYNC_TASK"))
     set_file_logger("invoker.log", logger=logging.getLogger("INVOKER"))
+    set_file_logger("sql.log", logger=logging.getLogger("sqlalchemy.engine"))
 
     app = Flask(app_config["application"], static_url_path='')
     app.static_folder = "./static"
