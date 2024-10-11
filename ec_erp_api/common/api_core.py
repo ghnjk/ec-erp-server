@@ -23,7 +23,7 @@ def clear_logger_handlers(logger):
 def set_file_logger(
         log_file_path,
         log_level=logging.DEBUG,
-        max_file_size_mb=500,
+        max_file_size_mb=100,
         max_file_count=20,
         encoding="UTF-8",
         logger=None,

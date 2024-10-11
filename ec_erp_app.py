@@ -17,10 +17,10 @@ def create_app():
     from ec_erp_api.apis.system import system_apis
     from ec_erp_api.apis.supplier import supplier_apis
     from ec_erp_api.apis.warehouse import warehouse_apis
-    set_file_logger("acc.log", logger=logging.getLogger("ACC"))
-    set_file_logger("async_task.log", logger=logging.getLogger("ASYNC_TASK"))
-    set_file_logger("invoker.log", logger=logging.getLogger("INVOKER"))
-    set_file_logger("sql.log", logger=logging.getLogger("sqlalchemy.engine"))
+    set_file_logger("logs/acc.log", logger=logging.getLogger("ACC"))
+    set_file_logger("logs/async_task.log", logger=logging.getLogger("ASYNC_TASK"))
+    set_file_logger("logs/invoker.log", logger=logging.getLogger("INVOKER"))
+    set_file_logger("logs/sql.log", logger=logging.getLogger("sqlalchemy.engine"))
 
     app = Flask(app_config["application"], static_url_path='')
     app.static_folder = "./static"
