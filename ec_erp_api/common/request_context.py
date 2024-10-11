@@ -10,20 +10,21 @@ import typing
 from ec_erp_api.models.mysql_backend import MysqlBackend, UserDto
 from flask import session
 from ec_erp_api.app_config import get_app_config
+from ec_erp_api.common.singleton import CachedSingletonInstanceHolder
 
-__GLOBAL_BACKEND_CACHE__: typing.Dict[str, MysqlBackend] = {}
+__GLOBAL_BACKEND_CACHE__: typing.Dict[str, CachedSingletonInstanceHolder] = {}
 APP_CONFIG = get_app_config()
 
 
 def get_backend() -> MysqlBackend:
     project_id = session.get("project_id", "dev")
-    if project_id in __GLOBAL_BACKEND_CACHE__:
-        return __GLOBAL_BACKEND_CACHE__[project_id]
+    if project_id in __GLOBAL_BACKEND_CACHE__ and __GLOBAL_BACKEND_CACHE__[project_id].get() is not None:
+        return __GLOBAL_BACKEND_CACHE__[project_id].get()
     db_config = APP_CONFIG["db_config"]
     backend = MysqlBackend(
         project_id, db_config["host"], db_config["port"], db_config["user"], db_config["password"]
     )
-    __GLOBAL_BACKEND_CACHE__[project_id] = backend
+    __GLOBAL_BACKEND_CACHE__[project_id] = CachedSingletonInstanceHolder(backend, timeout_sec=1800)
     return backend
 
 

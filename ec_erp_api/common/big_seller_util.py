@@ -11,19 +11,21 @@ from ec.bigseller.big_seller_client import BigSellerClient
 from ec.shop_manager import ShopManager
 from ec.sku_manager import SkuManager
 from ec_erp_api.models.mysql_backend import MysqlBackend
+from ec_erp_api.common.singleton import CachedSingletonInstanceHolder
 
-__BIG_SELLER_CLIENT__ = None
+__BIG_SELLER_CLIENT__ = CachedSingletonInstanceHolder(timeout_sec=300)
+__SKU_MANAGER__ = CachedSingletonInstanceHolder(timeout_sec=60)
 
 
 def build_big_seller_client() -> BigSellerClient:
-    global __BIG_SELLER_CLIENT__
-    if __BIG_SELLER_CLIENT__ is None:
+    if __BIG_SELLER_CLIENT__.get() is None:
         config = get_app_config()
         cookies_dir = config.get("cookies_dir", "../cookies")
-        __BIG_SELLER_CLIENT__ = BigSellerClient(config["ydm_token"],
-                                                cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))
-        __BIG_SELLER_CLIENT__.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
-    return __BIG_SELLER_CLIENT__
+        __BIG_SELLER_CLIENT__.set(BigSellerClient(config["ydm_token"],
+                                                  cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies")))
+        __BIG_SELLER_CLIENT__.get().login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+
+    return __BIG_SELLER_CLIENT__.get()
 
 
 def build_shop_manager() -> ShopManager:
@@ -34,13 +36,15 @@ def build_shop_manager() -> ShopManager:
 
 
 def build_sku_manager() -> SkuManager:
-    config = get_app_config()
-    cookies_dir = config.get("cookies_dir", "../cookies")
-    sku_manager = SkuManager(
-        os.path.join(cookies_dir, "all_sku.json")
-    )
-    sku_manager.load()
-    return sku_manager
+    if __SKU_MANAGER__.get() is None:
+        config = get_app_config()
+        cookies_dir = config.get("cookies_dir", "../cookies")
+        sku_manager = SkuManager(
+            os.path.join(cookies_dir, "all_sku.json")
+        )
+        sku_manager.load()
+        __SKU_MANAGER__.set(sku_manager)
+    return __SKU_MANAGER__.get()
 
 
 def build_backend(project_id: str) -> MysqlBackend:
