@@ -233,9 +233,13 @@ class PrintOrderThread(threading.Thread):
         note_list = []
         for note in picking_notes:
             picking_quantity = note["picking_quantity"]
-            picking_unit_name = note["picking_unit_name"]
-            picking_sku_name = note["picking_sku_name"]
-            note_list.append(f" # {picking_quantity} {picking_unit_name} {picking_sku_name}")
+            picking_unit_name: str = note["picking_unit_name"]
+            picking_sku_name: str = note["picking_sku_name"]
+            if picking_unit_name.strip().lower() == "m":
+                # 草地
+                note_list.append(f" # {picking_sku_name.strip()} * {picking_quantity} m")
+            else:
+                note_list.append(f" # {picking_quantity} {picking_unit_name} {picking_sku_name}")
         return note_list
 
     def _mark_all_order_printed(self):
