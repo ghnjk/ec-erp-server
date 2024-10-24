@@ -201,12 +201,11 @@ class PrintOrderThread(threading.Thread):
         line_height = 12
         cnt = 0
         all_notes = self._format_picking_note(picking_notes)
-        if len(all_notes) > 12:
-            mark_rect_height = (new_height - original_height) * 2
-            max_row_count = 12
-        else:
-            mark_rect_height = new_height - original_height
-            max_row_count = 6
+        mark_rect_height = new_height - original_height
+        max_row_count = 6
+        while len(all_notes) > 2 * max_row_count:
+            max_row_count += 6
+            mark_rect_height += new_height - original_height
         can.setFillColorRGB(0.7, 0.7, 0.7)
         can.rect(0, 0, original_width, mark_rect_height, fill=1)
         for note in all_notes:
