@@ -200,16 +200,22 @@ class PrintOrderThread(threading.Thread):
         # style.firstLineIndent = 22
         line_height = 12
         cnt = 0
-        mark_rect_height = new_height - original_height
+        all_notes = self._format_picking_note(picking_notes)
+        if len(all_notes) > 12:
+            mark_rect_height = (new_height - original_height) * 2
+            max_row_count = 12
+        else:
+            mark_rect_height = new_height - original_height
+            max_row_count = 6
         can.setFillColorRGB(0.7, 0.7, 0.7)
         can.rect(0, 0, original_width, mark_rect_height, fill=1)
-        for note in self._format_picking_note(picking_notes):
+        for note in all_notes:
             p = Paragraph(note, style)
             p.wrapOn(can, 3 * inch, 8 * inch)
-            if cnt < 6:
+            if cnt < max_row_count:
                 p.drawOn(can, 0, mark_rect_height - line_height - line_height * cnt)
             else:
-                p.drawOn(can, original_width / 2, mark_rect_height - line_height - line_height * (cnt - 6))
+                p.drawOn(can, original_width / 2, mark_rect_height - line_height - line_height * (cnt - max_row_count))
             cnt += 1
         can.showPage()
         can.save()
