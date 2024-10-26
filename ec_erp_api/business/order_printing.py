@@ -194,16 +194,16 @@ class PrintOrderThread(threading.Thread):
         packet = io.BytesIO()
         can = canvas.Canvas(packet, pagesize=(original_width, new_height))
         style_sheet = getSampleStyleSheet()
-        style = style_sheet['Heading4']
+        style = style_sheet['Heading2']
         # style.fontSize = 14
         # style.leading = 10
         # style.firstLineIndent = 22
-        line_height = 12
+        line_height = 14
         cnt = 0
         all_notes = self._format_picking_note(picking_notes)
         mark_rect_height = new_height - original_height
         max_row_count = 6
-        while len(all_notes) > 2 * max_row_count:
+        while len(all_notes) > max_row_count:
             max_row_count += 6
             mark_rect_height += new_height - original_height
         can.setFillColorRGB(0.7, 0.7, 0.7)
@@ -211,10 +211,11 @@ class PrintOrderThread(threading.Thread):
         for note in all_notes:
             p = Paragraph(note, style)
             p.wrapOn(can, 3 * inch, 8 * inch)
-            if cnt < max_row_count:
-                p.drawOn(can, 0, mark_rect_height - line_height - line_height * cnt)
-            else:
-                p.drawOn(can, original_width / 2, mark_rect_height - line_height - line_height * (cnt - max_row_count))
+            p.drawOn(can, 0, mark_rect_height - line_height - line_height * cnt)
+            # if cnt < max_row_count:
+            #     p.drawOn(can, 0, mark_rect_height - line_height - line_height * cnt)
+            # else:
+            #     p.drawOn(can, original_width / 2, mark_rect_height - line_height - line_height * (cnt - max_row_count))
             cnt += 1
         can.showPage()
         can.save()

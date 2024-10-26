@@ -40,17 +40,17 @@ def add_mark_to_page(page, original_width, original_height, new_height):
     from reportlab.graphics.barcode import code128
     import reportlab.lib.styles
     style_sheet = getSampleStyleSheet()
-    style = style_sheet['Heading4']
+    style = style_sheet['Heading2']
     # style.fontSize = 14
     # style.leading = 10
     # style.firstLineIndent = 22
-    line_height = 12
+    line_height = 14
     cnt = 0
     mark_rect_height = new_height - original_height
     can.setFillColorRGB(0.7, 0.7, 0.7)
     can.rect(0, 0, original_width, mark_rect_height, fill=1)
 
-    for i in range(12):
+    for i in range(6):
         line = text
         if len(line) == 0:
             continue
