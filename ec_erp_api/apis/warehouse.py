@@ -84,7 +84,7 @@ class OrderAnalysis(object):
             order_id = order["id"]
             platform_order_no = order["platformOrderId"]
             # 直接查询erp的订单详情的sku匹配结果
-            detail = self.client.get_order_detail(order_id)
+            detail = self._get_order_detail(order_id)
             sku_match_detail = []
             for item in detail["orderItemVoList"]:
                 allocated = item["allocated"]
@@ -213,6 +213,30 @@ class OrderAnalysis(object):
                 if sku_name is not None:
                     return sku_name
         return "UNKNOWN"
+
+    def _get_order_detail(self, order_id):
+        """
+        获取订单详情，需要优先从本地缓存文件获取
+        :param order_id:
+        :return:
+        """
+        import os
+        import json
+        from ec_erp_api.app_config import get_app_config
+        config = get_app_config()
+        cookies_dir = config.get("cookies_dir", "../cookies")
+        cache_dir = os.path.join(cookies_dir, "order_cache")
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir)
+        cache_file = os.path.join(cache_dir, f"{order_id}.json")
+        if os.path.exists(cache_file):
+            with open(cache_file, "r") as f:
+                detail = json.load(f)
+        else:
+            detail = self.client.get_order_detail(order_id)
+            with open(cache_file, "w") as f:
+                json.dump(detail, f)
+        return detail
 
 
 @warehouse_apis.route('/pre_submit_print_order', methods=["POST"])
