@@ -977,7 +977,7 @@ class MysqlBackend(object):
                 OrderPrintTask.progress, OrderPrintTask.logs,
                 OrderPrintTask.create_time, OrderPrintTask.modify_time
             ).filter(
-                SkuPickingNote.project_id == self.project_id
+                OrderPrintTask.project_id == self.project_id
             ).filter(
                 OrderPrintTask.task_id == task_id
             ).one()
