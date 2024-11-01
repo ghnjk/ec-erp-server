@@ -360,5 +360,5 @@ def query_print_order_task():
     if task is None:
         return response_util.pack_error_response(result_msg=f"打印任务{task_id}不存在")
     return response_util.pack_json_response({
-        "task": DtoUtil.to_dict(task)
+        "task": DtoUtil.to_dict(task, OrderPrintTask.columns)
     })

@@ -28,9 +28,11 @@ logger = logging.getLogger("sqlalchemy.engine")
 class DtoUtil(object):
 
     @classmethod
-    def to_dict(cls, o: object) -> dict:
+    def to_dict(cls, o: object, columns=None) -> dict:
         doc = {}
-        for c in o.columns:
+        if columns is not None:
+            columns = o.columns
+        for c in columns:
             try:
                 v = o.__getattribute__(c)
                 if isinstance(v, datetime):
