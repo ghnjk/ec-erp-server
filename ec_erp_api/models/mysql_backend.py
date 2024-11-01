@@ -30,7 +30,7 @@ class DtoUtil(object):
     @classmethod
     def to_dict(cls, o: object, columns=None) -> dict:
         doc = {}
-        if columns is not None:
+        if columns is None:
             columns = o.columns
         for c in columns:
             try:
