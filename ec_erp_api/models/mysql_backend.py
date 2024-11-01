@@ -968,10 +968,29 @@ class MysqlBackend(object):
         session.close()
         return task
 
+    def get_order_print_task_summary(self, task_id: str) -> typing.Optional[OrderPrintTask]:
+        session = self.DBSession()
+        try:
+            record: OrderPrintTask = session.query(OrderPrintTask).with_entities(
+                OrderPrintTask.project_id, OrderPrintTask.task_id,
+                OrderPrintTask.pdf_file_url, OrderPrintTask.current_step,
+                OrderPrintTask.progress, OrderPrintTask.logs,
+                OrderPrintTask.create_time, OrderPrintTask.modify_time
+            ).filter(
+                SkuPickingNote.project_id == self.project_id
+            ).filter(
+                OrderPrintTask.task_id == task_id
+            ).one()
+            return record
+        except NoResultFound:
+            return None
+        finally:
+            session.close()
+
     def _get_order_print_task(self, session, task_id) -> typing.Optional[OrderPrintTask]:
         try:
             record: OrderPrintTask = session.query(OrderPrintTask).filter(
-                SkuPickingNote.project_id == self.project_id
+                OrderPrintTask.project_id == self.project_id
             ).filter(
                 OrderPrintTask.task_id == task_id
             ).one()
@@ -1004,7 +1023,33 @@ class MysqlBackend(object):
         except Exception as e:
             session.rollback()
             session.close()
-            logger.error(f"store OrderPrintTask sku {note.sku}"
+            logger.error(f"store OrderPrintTask sku {task.task_id}"
+                         f"  failed: {e}")
+            raise
+
+    def update_order_print_task_without_order_list(self, task):
+        if task.project_id != self.project_id:
+            raise Exception("task project 非本项目数据")
+        session = self.DBSession()
+        try:
+            task.modify_time = datetime.now()
+            session.query(OrderPrintTask).filter(
+                OrderPrintTask.project_id == self.project_id,
+                OrderPrintTask.task_id == task.task_id
+            ).update({
+                OrderPrintTask.pdf_file_url: task.pdf_file_url,
+                OrderPrintTask.current_step: task.current_step,
+                OrderPrintTask.progress: task.progress,
+                OrderPrintTask.logs: task.logs,
+                OrderPrintTask.modify_time: task.modify_time
+            }, synchronize_session=False)
+            # 提交事务
+            session.commit()
+            session.close()
+        except Exception as e:
+            session.rollback()
+            session.close()
+            logger.error(f"update_order_print_task_without_order_list OrderPrintTask sku {task.task_id}"
                          f"  failed: {e}")
             raise
 

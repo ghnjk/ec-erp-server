@@ -152,7 +152,7 @@ class PrintOrderThread(threading.Thread):
         return base_dir
 
     def _save_task(self):
-        self.backend.store_order_print_task(self.task)
+        self.backend.update_order_print_task_without_order_list(self.task)
 
     def _add_note_to_pdf(self, origin_pdf_file: str, noted_pdf_file: str, picking_notes: dict):
         """

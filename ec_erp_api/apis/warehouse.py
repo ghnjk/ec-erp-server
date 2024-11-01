@@ -337,13 +337,15 @@ def start_run_print_order_task():
     if task is None:
         return response_util.pack_error_response(result_msg=f"打印任务{task_id}不存在")
     append_log_to_task(task, "启动打印任务")
-    backend.store_order_print_task(task)
+    backend.update_order_print_task_without_order_list(task)
     t = PrintOrderThread(
         task, request_context.get_backend(), big_seller_util.build_big_seller_client()
     )
     t.start()
+    task_dict = DtoUtil.to_dict(task)
+    del task_dict["order_list"]
     return response_util.pack_json_response({
-        "task": DtoUtil.to_dict(task)
+        "task": task_dict
     })
 
 
@@ -354,7 +356,7 @@ def query_print_order_task():
         return response_util.pack_error_response(1008, "权限不足")
     task_id = request_util.get_str_param("task_id")
     backend = request_context.get_backend()
-    task = backend.get_order_print_task(task_id)
+    task = backend.get_order_print_task_summary(task_id)
     if task is None:
         return response_util.pack_error_response(result_msg=f"打印任务{task_id}不存在")
     return response_util.pack_json_response({
