@@ -1459,13 +1459,13 @@ class BigSellerClient:
             req_text = js.dumps(data, ensure_ascii=False)[: 128]
         else:
             req_text = js.dumps(json, ensure_ascii=False)[: 128]
-        self.logger.info(f"POST REQUEST {url} req_text: {req_text} ...")
+        self.logger.info(f"POST REQUEST {url} req_text: {req_text}.")
         if timeout is not None:
             res = self.session.post(url, data=data, json=json, timeout=timeout)
         else:
             res = self.session.post(url, data=data, json=json)
         res_code = res.status_code
-        res_text = res.text[:128]
+        res_text = res.text[:256]
         self.logger.info(f"POST RESPONSE {url} http_code: {res_code} res_text: {res_text}")
         return res
 

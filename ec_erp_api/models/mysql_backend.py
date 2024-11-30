@@ -5,6 +5,7 @@
 @author: jkguo
 @create: 2024/2/24
 """
+import json
 import logging
 import typing
 from datetime import datetime
@@ -12,12 +13,11 @@ from datetime import datetime
 import sqlalchemy
 from sqlalchemy import create_engine, String, Boolean, JSON, Integer, Float, DateTime, sql, Column, PrimaryKeyConstraint
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.sql import text
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.sql import text
-import json
+
 from ec_erp_api.common import codec_util
 
 func_declarative_base = declarative_base
