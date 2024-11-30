@@ -1465,7 +1465,7 @@ class BigSellerClient:
         else:
             res = self.session.post(url, data=data, json=json)
         res_code = res.status_code
-        res_text = res.text[:256]
+        res_text = res.text[:1024]
         self.logger.info(f"POST RESPONSE {url} http_code: {res_code} res_text: {res_text}")
         return res
 

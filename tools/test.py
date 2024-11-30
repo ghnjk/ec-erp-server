@@ -111,5 +111,16 @@ def main():
     merger.close()
 
 
+def parse_pdf():
+    mark_order_dir = f"data/pdf/1727665065662500"
+    pdf_path = f"{mark_order_dir}/test.pdf"
+    reader = PdfReader(pdf_path)
+    for i in range(len(reader.pages)):
+        page = reader.pages[i]
+        page_text = page.extract_text()
+        print(f"> [page {i + 1}] :")
+        print(page_text)
+
+
 if __name__ == '__main__':
-    main()
+    parse_pdf()

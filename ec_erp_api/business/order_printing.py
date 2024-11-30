@@ -331,7 +331,7 @@ class PrintOrderThread(threading.Thread):
             page.mediabox.upper_right = (original_width, new_height)
             page.add_transformation(Transformation().translate(0, transfer_y))
             # all merge page <<
-            if page_text.find(f"Order No:{order_no}") >= 0:
+            if page_text.find(f"Order No:{order_no}") >= 0 or page_text.find(f"Order No: {order_no}") >= 0:
                 origin_pdf_file = os.path.join(self.base_dir, f"split.{order_no}.origin.pdf")
                 split_writer.write(origin_pdf_file)
                 split_writer.close()
