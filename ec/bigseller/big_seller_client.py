@@ -1540,7 +1540,7 @@ class BigSellerClient:
           "puid": null
         }
         """
-        url = "https://www.bigseller.com/api/v1/order/confirmLabelPrint.json"
+        url = "https://www.bigseller.com/api/v1/inventory/pageList.json"
         req = {
             "pageNo": 1,
             "pageSize": 50,
