@@ -3585,3 +3585,150 @@ response:
   }
 }
 ```
+
+## 商品库存和预测信息接口
+
+url: https://www.bigseller.com/api/v1/inventory/pageList.json
+
+for-data: post
+
+```
+pageNo=1
+pageSize=50
+searchType=skuName
+searchContent=A-1-Golden-Maple%20leaf
+inquireType=0
+stockStatus=
+isGroup=0
+orderBy=
+desc=
+fullCid=
+queryDistribution=1
+saleStatus=
+warehouseIds=
+```
+
+response:
+
+```
+{
+  "code": 0,
+  "errorType": 0,
+  "msg": "操作成功",
+  "msgObjStr": "",
+  "data": {
+    "currency": "PHP",
+    "qo": {
+      "pageNo": 1,
+      "pageSize": 50,
+      "orderBy": "",
+      "desc": null,
+      "inquireType": 0,
+      "searchType": "skuName",
+      "searchContent": "A-1-Golden-Maple leaf",
+      "stockStatus": "",
+      "isGroup": 0,
+      "skuIds": null,
+      "warehouseSkuIds": null,
+      "warehouseId": null,
+      "warehouseIds": [
+        27763
+      ],
+      "areaSeparateWarehouseIds": null,
+      "selectSkuIds": null,
+      "ids": null,
+      "isQueryWarehouseSku": null,
+      "viewName": null,
+      "inoutType": null,
+      "idList": null,
+      "isViewCost": 1,
+      "selectedIdListStr": null,
+      "scanContent": null,
+      "fullCid": "",
+      "inRule": null,
+      "operationType": null,
+      "saleStatus": null,
+      "showRetail": null,
+      "platform": null,
+      "evalProSel": 0,
+      "suggestionType": null,
+      "type": null,
+      "hasSuggestion": null,
+      "putAside": null,
+      "needGroupSkuImage": null,
+      "zoneId": null,
+      "currency": null,
+      "filterSpu": null,
+      "queryDistribution": 1,
+      "groupShowDistribution": 0,
+      "salesContent": null,
+      "minSalesValue": null,
+      "maxSalesValue": null,
+      "preUpdate": null
+    },
+    "page": {
+      "pageNo": 1,
+      "pageToken": null,
+      "pageSize": 50,
+      "totalPage": 1,
+      "totalSize": 1,
+      "rows": [
+        {
+          "createTime": null,
+          "updateTime": null,
+          "id": null,
+          "warehouseSkuId": 27773442,
+          "skuId": 27410427,
+          "sku": "A-1-Golden-Maple leaf",
+          "warehouseId": 27763,
+          "warehouseName": "超市仓库",
+          "title": "金色枫叶1pcs",
+          "onhand": 12903,
+          "allocated": 276,
+          "promoReservedStock": 0,
+          "available": 12627,
+          "common": 12627,
+          "onTheWay": 0,
+          "transferOnTheWay": 0,
+          "purchaseOnTheWay": 0,
+          "cost": "8.79",
+          "totalCost": "113417.37",
+          "threshold": 0,
+          "thresholdType": 0,
+          "image": "https://res.bigseller.pro/album/279590/20230603074446b4bf29067f2227517d260057c6385011.jpg?imageView2/1/w/300/h/300",
+          "isCurrentMapping": null,
+          "isGroup": 0,
+          "isSelect": null,
+          "skuGroupVoList": null,
+          "shelves": null,
+          "shelfId": null,
+          "shelfName": "No Shelf",
+          "isStockCount": 0,
+          "stockCounting": null,
+          "merchantSkuId": "90000642",
+          "gtinCode": null,
+          "purchaseDays": null,
+          "safetyDays": null,
+          "commodityLong": 0,
+          "commodityWide": 0,
+          "commodityHigh": 0,
+          "num": 0,
+          "commodityWeight": 0,
+          "suggestionType": null,
+          "putAside": null,
+          "avgDailySales": 214.75,
+          "purchaseSaleDays": -1,
+          "avgJson": null,
+          "recommendQuantity": null,
+          "isAreaSeparate": 0,
+          "shelfVos": null,
+          "wareType": 0,
+          "skuType": 0,
+          "distributionSku": 0,
+          "puid": null
+        }
+      ]
+    }
+  }
+}
+```

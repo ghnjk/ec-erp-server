@@ -100,13 +100,14 @@ class SkuManager(object):
                     self.sku_detail_variant[
                         r["sku"]
                     ] = r["skuRelations"]
-                    other_mapping = client.get_more_sku_mapping(r["id"])
-                    print(f"get_more_sku_mapping return {len(other_mapping)} mapping")
-                    self.sku_detail_variant[
-                        r["sku"]
-                    ].extend(
-                        other_mapping
-                    )
+                    # todo: 该接口已经改变，后续需要调整
+                    # other_mapping = client.get_more_sku_mapping(r["id"])
+                    # print(f"get_more_sku_mapping return {len(other_mapping)} mapping")
+                    # self.sku_detail_variant[
+                    #     r["sku"]
+                    # ].extend(
+                    #     other_mapping
+                    # )
             else:
                 self.sku_detail_variant[
                     r["sku"]

@@ -52,15 +52,16 @@ def sync_sku_inventory():
     shipping_sku_map = load_all_shipping_sku_info(backend)
     _, sku_list = backend.search_sku(sku_group=None, sku_name=None, sku=None, offset=0, limit=10000)
     for sku_info in sku_list:
-        detail = client.query_sku_detail(int(sku_info.erp_sku_id))
-        inventory = 0
-        for vo in detail["warehouseVoList"]:
-            inventory += vo["available"]
+        detail = client.query_sku_inventory_detail(sku_info.sku)
+        if detail is None:
+            print(f"{sku_info.sku} query_sku_inventory_detail return None.")
+            continue
+        inventory = detail["available"]
         sku_info.inventory = inventory
         sku_info.erp_sku_name = detail["title"]
-        sku_info.erp_sku_image_url = detail["imgUrl"]
+        sku_info.erp_sku_image_url = detail["image"]
         # 计算平均销售sku数量
-        sku_info.avg_sell_quantity = load_and_calc_sku_avg_sell_quantity(backend, sku_info.sku)
+        sku_info.avg_sell_quantity = round(detail["avgDailySales"] * 1.1, 2)
         # 计算库存支撑天数
         if sku_info.avg_sell_quantity > 0.01:
             sku_info.inventory_support_days = int(sku_info.inventory / sku_info.avg_sell_quantity)

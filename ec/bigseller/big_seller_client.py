@@ -429,6 +429,7 @@ class BigSellerClient:
 
     def get_more_sku_mapping(self, sku_id: int):
         """
+        deprecated
         返回额外的sku映射关系
         :param sku_id:
         :return: [
@@ -1479,3 +1480,87 @@ class BigSellerClient:
         res_text = res.text[:128]
         self.logger.info(f"GET RESPONSE {url} http_code: {res_code} res_text: {res_text}")
         return res
+
+    def query_sku_inventory_detail(self, sku: str):
+        """
+        根据sku查询仓库当前sku数和预测sku
+        :param sku: sku
+        :return: {
+          "createTime": null,
+          "updateTime": null,
+          "id": null,
+          "warehouseSkuId": 27773442,
+          "skuId": 27410427,
+          "sku": "A-1-Golden-Maple leaf",
+          "warehouseId": 27763,
+          "warehouseName": "超市仓库",
+          "title": "金色枫叶1pcs",
+          "onhand": 12903,
+          "allocated": 276,
+          "promoReservedStock": 0,
+          "available": 12627,
+          "common": 12627,
+          "onTheWay": 0,
+          "transferOnTheWay": 0,
+          "purchaseOnTheWay": 0,
+          "cost": "8.79",
+          "totalCost": "113417.37",
+          "threshold": 0,
+          "thresholdType": 0,
+          "image": "https://res.bigseller.pro/album/279590/20230603074446b4bf29067f2227517d260057c6385011.jpg?imageView2/1/w/300/h/300",
+          "isCurrentMapping": null,
+          "isGroup": 0,
+          "isSelect": null,
+          "skuGroupVoList": null,
+          "shelves": null,
+          "shelfId": null,
+          "shelfName": "No Shelf",
+          "isStockCount": 0,
+          "stockCounting": null,
+          "merchantSkuId": "90000642",
+          "gtinCode": null,
+          "purchaseDays": null,
+          "safetyDays": null,
+          "commodityLong": 0,
+          "commodityWide": 0,
+          "commodityHigh": 0,
+          "num": 0,
+          "commodityWeight": 0,
+          "suggestionType": null,
+          "putAside": null,
+          "avgDailySales": 214.75,
+          "purchaseSaleDays": -1,
+          "avgJson": null,
+          "recommendQuantity": null,
+          "isAreaSeparate": 0,
+          "shelfVos": null,
+          "wareType": 0,
+          "skuType": 0,
+          "distributionSku": 0,
+          "puid": null
+        }
+        """
+        url = "https://www.bigseller.com/api/v1/order/confirmLabelPrint.json"
+        req = {
+            "pageNo": 1,
+            "pageSize": 50,
+            "searchType": "skuName",
+            "searchContent": sku,
+            "inquireType": 0,
+            "isGroup": 0,
+            "queryDistribution": 1,
+            "warehouseIds": ""
+        }
+        res = self.post(url, data=req, timeout=30)
+        if res.status_code != 200:
+            time.sleep(0.5)
+            res = self.post(url, req, timeout=30)
+        print(f"query_sku_inventory_detail {sku} result {res.text}")
+        rows = res.json()["data"]["page"]["rows"]
+        match_rows = []
+        for r in rows:
+            if r["sku"] == sku:
+                match_rows.append(r)
+        if len(match_rows) == 1:
+            return match_rows[0]
+        return None

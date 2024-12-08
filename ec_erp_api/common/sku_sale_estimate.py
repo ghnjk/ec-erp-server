@@ -49,8 +49,11 @@ class SkuSaleEstimate(object):
     def store(self):
         for sku in self.sku_est_data.keys():
             for shop_id in self.sku_est_data[sku].keys():
-                est = self.sku_est_data[sku][shop_id]
-                self.backend.store_sku_sale_estimate(est)
+                try:
+                    est = self.sku_est_data[sku][shop_id]
+                    self.backend.store_sku_sale_estimate(est)
+                except Exception as e:
+                    print(e)
 
     def _get_shop_est_dict(self, sku: str, shop_id: str, sale_doc: dict, var_sku_name: str) -> SkuSaleEstimateDto:
         sku = str(sku).strip()
