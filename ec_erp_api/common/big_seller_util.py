@@ -50,7 +50,9 @@ def build_sku_manager() -> SkuManager:
 def build_backend(project_id: str) -> MysqlBackend:
     config = get_app_config()
     db_config = config["db_config"]
+    db_name = config.get("db_name", "ec_erp_db")
     backend = MysqlBackend(
-        project_id, db_config["host"], db_config["port"], db_config["user"], db_config["password"]
+        project_id, db_config["host"], db_config["port"], db_config["user"], db_config["password"],
+        db_name=db_name
     )
     return backend

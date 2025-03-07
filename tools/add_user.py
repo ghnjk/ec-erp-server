@@ -15,24 +15,29 @@ from ec_erp_api.common import codec_util
 
 
 def add_user():
+    if len(sys.argv) != 4:
+        print(f"invalid arguments. {sys.argv[0]} project_id user password")
+        exit(-1)
+    project_id = sys.argv[1]
     config = get_app_config()
     db_config = config["db_config"]
     backend = MysqlBackend(
-        "philipine", db_config["host"], db_config["port"], db_config["user"], db_config["password"]
+        project_id, db_config["host"], db_config["port"], db_config["user"], db_config["password"],
+        db_name=config["db_name"]
     )
     backend.store_user(UserDto(
-        user_name=sys.argv[1],
-        default_project_id="philipine",
-        password=codec_util.calc_sha256(sys.argv[2]),
+        user_name=sys.argv[2],
+        default_project_id=project_id,
+        password=codec_util.calc_sha256(sys.argv[3]),
         roles=[
             {
-                "project_id": "philipine",
+                "project_id": project_id,
                 "name": "supply",
                 "memo": "供应链管理",
                 "level": 1
             },
             {
-                "project_id": "philipine",
+                "project_id": project_id,
                 "name": "storehouse",
                 "memo": "仓库管理",
                 "level": 1

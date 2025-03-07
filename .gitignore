@@ -166,3 +166,4 @@ cython_debug/
 # sensitive file
 application.json
 big_seller.cookies
+conf/release_conf
