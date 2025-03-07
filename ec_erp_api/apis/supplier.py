@@ -227,6 +227,8 @@ def sync_all_sku():
         )
         inventory = 0
         for vo in sku_info["warehouseVoList"]:
+            if vo["id"] != config["big_seller_warehouse_id"]:
+                continue
             inventory += vo["available"]
         item.inventory = inventory
         item.erp_sku_name = sku_info["title"]
