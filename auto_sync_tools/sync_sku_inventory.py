@@ -47,11 +47,23 @@ def load_all_shipping_sku_info(backend: MysqlBackend):
     return shipping_sku_map
 
 
+def get_real_inventory(client, warehouse_id, sku_id):
+    sku_info = client.query_sku_detail(
+        sku_id
+    )
+    inventory = 0
+    for vo in sku_info["warehouseVoList"]:
+        if vo["id"] != warehouse_id:
+            continue
+        inventory += vo["available"]
+    return inventory
+
+
 def sync_sku_inventory():
-    project_id = sys.argv[1]
+    config = get_app_config()
+    project_id = config.get("sync_tool_project_id", "philipine")
     backend = build_backend(project_id)
     client = build_big_seller_client()
-    config = get_app_config()
     warehouse_id = config["big_seller_warehouse_id"]
     shipping_sku_map = load_all_shipping_sku_info(backend)
     _, sku_list = backend.search_sku(sku_group=None, sku_name=None, sku=None, offset=0, limit=10000)
@@ -60,7 +72,7 @@ def sync_sku_inventory():
         if detail is None:
             print(f"{sku_info.sku} query_sku_inventory_detail return None.")
             continue
-        inventory = detail["available"]
+        inventory = get_real_inventory(client, warehouse_id, sku_info.sku)
         sku_info.inventory = inventory
         sku_info.erp_sku_name = detail["title"]
         sku_info.erp_sku_image_url = detail["image"]
@@ -73,10 +85,8 @@ def sync_sku_inventory():
             sku_info.inventory_support_days = sku_info.inventory / 0.01
         sku_info.shipping_stock_quantity = shipping_sku_map.get(sku_info.sku, 0)
         backend.store_sku(sku_info)
-        time.sleep(0.1)
+        time.sleep(0.3)
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print(f"invalid arguments. {sys.argv[0]} project_id")
     sync_sku_inventory()
