@@ -19,7 +19,8 @@ def import_suppliers():
     config = get_app_config()
     db_config = config["db_config"]
     backend = MysqlBackend(
-        "philipine", db_config["host"], db_config["port"], db_config["user"], db_config["password"]
+        "philipine", db_config["host"], db_config["port"], db_config["user"], db_config["password"],
+        db_config.get("db_name", "ec_erp_db")
     )
     df = pd.read_excel(sys.argv[1], sheet_name="供应商信息")
     _, all_sp = backend.search_suppliers(0, 100)

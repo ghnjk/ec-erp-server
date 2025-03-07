@@ -22,7 +22,8 @@ def get_backend() -> MysqlBackend:
         return __GLOBAL_BACKEND_CACHE__[project_id].get()
     db_config = APP_CONFIG["db_config"]
     backend = MysqlBackend(
-        project_id, db_config["host"], db_config["port"], db_config["user"], db_config["password"], echo_stdout=False
+        project_id, db_config["host"], db_config["port"], db_config["user"], db_config["password"], echo_stdout=False,
+        db_name=db_config.get("db_name", "ec_erp_db")
     )
     __GLOBAL_BACKEND_CACHE__[project_id] = CachedSingletonInstanceHolder(backend, timeout_sec=1800)
     return backend

@@ -16,7 +16,8 @@ def init_db():
     config = get_app_config()
     db_config = config["db_config"]
     backend = MysqlBackend(
-        "philipine", db_config["host"], db_config["port"], db_config["user"], db_config["password"]
+        "philipine", db_config["host"], db_config["port"], db_config["user"], db_config["password"],
+        db_config.get("db_name", "ec_erp_db")
     )
     # 创建库表
     backend.init_db()
