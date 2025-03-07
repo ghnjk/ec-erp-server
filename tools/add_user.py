@@ -23,7 +23,7 @@ def add_user():
     db_config = config["db_config"]
     backend = MysqlBackend(
         project_id, db_config["host"], db_config["port"], db_config["user"], db_config["password"],
-        db_name=config["db_name"]
+        db_name=db_config["db_name"]
     )
     backend.store_user(UserDto(
         user_name=sys.argv[2],
