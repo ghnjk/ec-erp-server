@@ -140,6 +140,7 @@ def add_sku():
     success_count = 0
     ignore_count = 0
     fail_count = 0
+    warehouse_id = config["big_seller_warehouse_id"]
     for line in skus.split("\n"):
         line = line.strip()
         if len(line) <= 0:
@@ -154,9 +155,7 @@ def add_sku():
         sku_name = ""
         sku_unit_name = ""
         sku_unit_quantity = 1
-        avg_sell_quantity = 0
         shipping_stock_quantity = 0
-        inventory_support_days = 0
         sku_id = sm.get_sku_id(sku)
         if sku_id is None and not has_load_all_sku:
             sm.load_and_update_all_sku(client)
@@ -174,6 +173,14 @@ def add_sku():
             if vo["id"] != config["big_seller_warehouse_id"]:
                 continue
             inventory += vo["available"]
+        # 计算平均销售sku数量
+        detail = client.query_sku_inventory_detail(sku_info.sku, warehouse_id)
+        avg_sell_quantity = round(detail["avgDailySales"] * 1.1, 2)
+        # 计算库存支撑天数
+        if avg_sell_quantity > 0.01:
+            inventory_support_days = int(inventory / avg_sell_quantity)
+        else:
+            inventory_support_days = inventory / 0.01
         s = SkuDto(
             project_id=request_context.get_current_project_id(),
             sku=sku,
