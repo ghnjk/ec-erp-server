@@ -171,6 +171,8 @@ def add_sku():
         )
         inventory = 0
         for vo in sku_info["warehouseVoList"]:
+            if vo["id"] != config["big_seller_warehouse_id"]:
+                continue
             inventory += vo["available"]
         s = SkuDto(
             project_id=request_context.get_current_project_id(),
