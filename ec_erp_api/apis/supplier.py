@@ -221,17 +221,11 @@ def sync_all_sku():
     sm.load()
     client = BigSellerClient(config["ydm_token"], cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))
     client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
-    has_load_all_sku = False
     update_count = 0
     warehouse_id = config["big_seller_warehouse_id"]
     for item in sku_list:
-        sku_id = sm.get_sku_id(item.sku)
-        if sku_id is None and not has_load_all_sku:
-            sm.load_and_update_all_sku(client)
-            has_load_all_sku = True
-        sku_id = sm.get_sku_id(item.sku)
-        if sku_id is None:
-            continue
+        detail = client.query_sku_inventory_detail(item.sku, warehouse_id)
+        sku_id = detail["skuId"]
         sku_info = client.query_sku_detail(
             sku_id
         )
@@ -245,7 +239,6 @@ def sync_all_sku():
         item.erp_sku_image_url = sku_info["imgUrl"]
         item.erp_sku_id = str(sku_info["id"])
         # 计算平均销售sku数量
-        detail = client.query_sku_inventory_detail(item.sku, warehouse_id)
         item.avg_sell_quantity = round(detail["avgDailySales"] * 1.1, 2)
         # 计算库存支撑天数
         if item.avg_sell_quantity > 0.01:
