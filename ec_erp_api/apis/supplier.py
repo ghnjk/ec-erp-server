@@ -216,6 +216,7 @@ def sync_all_sku():
     client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
     has_load_all_sku = False
     update_count = 0
+    warehouse_id = config["big_seller_warehouse_id"]
     for item in sku_list:
         sku_id = sm.get_sku_id(item.sku)
         if sku_id is None and not has_load_all_sku:
@@ -229,13 +230,21 @@ def sync_all_sku():
         )
         inventory = 0
         for vo in sku_info["warehouseVoList"]:
-            if vo["id"] != config["big_seller_warehouse_id"]:
+            if vo["id"] != warehouse_id:
                 continue
             inventory += vo["available"]
         item.inventory = inventory
         item.erp_sku_name = sku_info["title"]
         item.erp_sku_image_url = sku_info["imgUrl"]
         item.erp_sku_id = str(sku_info["id"])
+        # 计算平均销售sku数量
+        detail = client.query_sku_inventory_detail(sku_info.sku, warehouse_id)
+        item.avg_sell_quantity = round(detail["avgDailySales"] * 1.1, 2)
+        # 计算库存支撑天数
+        if item.avg_sell_quantity > 0.01:
+            item.inventory_support_days = int(item.inventory / item.avg_sell_quantity)
+        else:
+            item.inventory_support_days = item.inventory / 0.01
         backend.store_sku(item)
         update_count += 1
         time.sleep(0.3)
