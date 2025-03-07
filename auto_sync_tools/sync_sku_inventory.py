@@ -72,7 +72,7 @@ def sync_sku_inventory():
         if detail is None:
             print(f"{sku_info.sku} query_sku_inventory_detail return None.")
             continue
-        inventory = get_real_inventory(client, warehouse_id, detail["id"])
+        inventory = get_real_inventory(client, warehouse_id, sku_info.erp_sku_id)
         sku_info.inventory = inventory
         sku_info.erp_sku_name = detail["title"]
         sku_info.erp_sku_image_url = detail["image"]
