@@ -174,7 +174,7 @@ def add_sku():
                 continue
             inventory += vo["available"]
         # 计算平均销售sku数量
-        detail = client.query_sku_inventory_detail(sku_info.sku, warehouse_id)
+        detail = client.query_sku_inventory_detail(sku, warehouse_id)
         avg_sell_quantity = round(detail["avgDailySales"] * 1.1, 2)
         # 计算库存支撑天数
         if avg_sell_quantity > 0.01:
