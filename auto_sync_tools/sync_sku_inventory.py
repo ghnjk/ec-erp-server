@@ -11,6 +11,7 @@ import sys
 import typing
 
 sys.path.append("..")
+from ec_erp_api.app_config import get_app_config
 from ec_erp_api.common.big_seller_util import build_big_seller_client, build_backend, MysqlBackend
 
 
@@ -47,12 +48,15 @@ def load_all_shipping_sku_info(backend: MysqlBackend):
 
 
 def sync_sku_inventory():
-    backend = build_backend("philipine")
+    project_id = sys.argv[1]
+    backend = build_backend(project_id)
     client = build_big_seller_client()
+    config = get_app_config()
+    warehouse_id = config["big_seller_warehouse_id"]
     shipping_sku_map = load_all_shipping_sku_info(backend)
     _, sku_list = backend.search_sku(sku_group=None, sku_name=None, sku=None, offset=0, limit=10000)
     for sku_info in sku_list:
-        detail = client.query_sku_inventory_detail(sku_info.sku)
+        detail = client.query_sku_inventory_detail(sku_info.sku, warehouse_id)
         if detail is None:
             print(f"{sku_info.sku} query_sku_inventory_detail return None.")
             continue
@@ -73,4 +77,6 @@ def sync_sku_inventory():
 
 
 if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        print(f"invalid arguments. {sys.argv[0]} project_id")
     sync_sku_inventory()

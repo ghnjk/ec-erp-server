@@ -1481,10 +1481,11 @@ class BigSellerClient:
         self.logger.info(f"GET RESPONSE {url} http_code: {res_code} res_text: {res_text}")
         return res
 
-    def query_sku_inventory_detail(self, sku: str):
+    def query_sku_inventory_detail(self, sku: str, warehouse_id: int):
         """
         根据sku查询仓库当前sku数和预测sku
         :param sku: sku
+        :param warehouse_id: warehouse_id
         :return: {
           "createTime": null,
           "updateTime": null,
@@ -1549,7 +1550,7 @@ class BigSellerClient:
             "inquireType": 0,
             "isGroup": 0,
             "queryDistribution": 1,
-            "warehouseIds": ""
+            "warehouseIds": str(warehouse_id)
         }
         res = self.post(url, data=req, timeout=30)
         if res.status_code != 200:
