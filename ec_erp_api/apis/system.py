@@ -65,7 +65,8 @@ def _get_login_user_info():
         "userName": user.user_name,
         "groupName": "",
         "roles": roles,
-        "admin": user.is_admin
+        "admin": user.is_admin,
+        "project_id": project_id
     })
 
 
