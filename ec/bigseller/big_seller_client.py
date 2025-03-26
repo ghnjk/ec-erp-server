@@ -667,7 +667,7 @@ class BigSellerClient:
                 fd.write(chunk)
         self.logger.info(f"DOWNLOAD url {url} ok.")
 
-    def get_wait_print_order_ship_provider_list(self):
+    def get_wait_print_order_ship_provider_list(self, ware_house_id: int):
         """
         查询待打印订单按物流方式的统计信息
         :return: [
@@ -757,7 +757,7 @@ class BigSellerClient:
             "desc": 1,
             "orderBy": "skus",
             "wareType": None,
-            "warehouseIdList": None,
+            "warehouseIdList": [ware_house_id],
             "packageTypes": None,
             "tiktokPackageType": None,
             "waveSearchType": None,

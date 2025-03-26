@@ -25,8 +25,12 @@ warehouse_apis = Blueprint('warehouse', __name__)
 def get_order_statics():
     if not request_context.validate_user_permission(request_context.PMS_WAREHOUSE):
         return response_util.pack_error_response(1008, "权限不足")
+    from ec_erp_api.app_config import get_app_config
+    config = get_app_config()
     client = big_seller_util.build_big_seller_client()
-    res = client.get_wait_print_order_ship_provider_list()
+    res = client.get_wait_print_order_ship_provider_list(
+        config.get("big_seller_warehouse_id")
+    )
     return response_util.pack_json_response({
         "ship_provider_list": res
     })
