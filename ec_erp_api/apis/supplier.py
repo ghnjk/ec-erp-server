@@ -226,9 +226,18 @@ def sync_all_sku():
     client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
     update_count = 0
     warehouse_id = config["big_seller_warehouse_id"]
+    fail_count = 0
+    has_load_all_sku = False
     for item in sku_list:
+        sku_id = sm.get_sku_id(item)
+        if sku_id is None and not has_load_all_sku:
+            sm.load_and_update_all_sku(client)
+            has_load_all_sku = True
+        sku_id = sm.get_sku_id(item)
+        if sku_id is None:
+            fail_count += 1
+            continue
         detail = client.query_sku_inventory_detail(item.sku, warehouse_id)
-        sku_id = detail["skuId"]
         sku_info = client.query_sku_detail(
             sku_id
         )
@@ -252,7 +261,8 @@ def sync_all_sku():
         update_count += 1
         time.sleep(0.3)
     return response_util.pack_response({
-        "update_count": update_count
+        "update_count": update_count,
+        "fail_count": fail_count
     })
 
 
