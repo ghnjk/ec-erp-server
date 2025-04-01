@@ -235,6 +235,7 @@ def sync_all_sku():
             has_load_all_sku = True
         sku_id = sm.get_sku_id(item)
         if sku_id is None:
+            print(f"cannot found sku {item} in sku manager.")
             fail_count += 1
             continue
         detail = client.query_sku_inventory_detail(item.sku, warehouse_id)
