@@ -13,6 +13,8 @@
   "big_seller_mail": "xxxx@xx.com",
   "big_seller_encoded_passwd": "xxxx",
   "big_seller_warehouse_id": 34324,
+  "big_seller_shelf_name": "Default Shelf",
+  "big_seller_shelf_id": 1799725,
   "cookies_dir": "/data/ec-erp-server/cookies",
   "es_hosts": [
     "https://xx.xx.xx.xx:9200"

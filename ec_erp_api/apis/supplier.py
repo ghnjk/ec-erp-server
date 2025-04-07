@@ -441,8 +441,8 @@ def sync_stock_to_erp(order: PurchaseOrder):
             "stockPrice": item["unit_price"] / 100.0,
             "shelfList": [
                 {
-                    "shelfId": "",
-                    "shelfName": "",
+                    "shelfId": config["big_seller_shelf_id"],
+                    "shelfName": config["big_seller_shelf_name"],
                     "stockQty": item["check_in_quantity"] * item["sku_unit_quantity"]
                 }
             ]
