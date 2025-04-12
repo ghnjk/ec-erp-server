@@ -18,15 +18,14 @@ def import_picking_notes():
     """从Excel导入SKU拣货备注数据"""
     config = get_app_config()
     db_config = config["db_config"]
+    project_id = config["sync_tool_project_id"]
     
     # 检查命令行参数
-    if len(sys.argv) < 3:
-        print("使用方法: python import_picking_note.py <项目名> <excel文件路径>")
+    if len(sys.argv) < 2:
+        print("使用方法: python import_picking_note.py <excel文件路径>")
         sys.exit(1)
     
-    # 从命令行读取项目名和Excel文件路径
-    project_id = sys.argv[1]
-    excel_path = sys.argv[2]
+    excel_path = sys.argv[1]
     
     backend = MysqlBackend(
         project_id, db_config["host"], db_config["port"], db_config["user"], db_config["password"],
@@ -51,7 +50,7 @@ def import_picking_notes():
         picking_sku_name = row["拣货SKU名"]
         
         # 处理包装模式相关字段
-        support_pkg_picking = bool(row.get("是否支持PKG打包", False))
+        support_pkg_picking = bool(row.get("是否支持PKG打包") == "是")
         pkg_picking_unit = float(row.get("1 PKG=多少SKU", 0.0))
         pkg_picking_unit_name = row.get("PKG打包单位名", "")
         
