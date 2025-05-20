@@ -17,9 +17,10 @@ from ec_erp_api.common import codec_util
 
 def import_suppliers():
     config = get_app_config()
+    sync_tool_project_id = config["sync_tool_project_id"]
     db_config = config["db_config"]
     backend = MysqlBackend(
-        "philipine", db_config["host"], db_config["port"], db_config["user"], db_config["password"],
+        sync_tool_project_id, db_config["host"], db_config["port"], db_config["user"], db_config["password"],
         db_config.get("db_name", "ec_erp_db")
     )
     df = pd.read_excel(sys.argv[1], sheet_name="供应商信息")
@@ -30,7 +31,7 @@ def import_suppliers():
         notes = row["备注"]
         sp = SupplierDto(
             supplier_id=-1,
-            project_id="philipine",
+            project_id=sync_tool_project_id,
             supplier_name=supplier_name,
             wechat_account=wxchat,
             detail=notes
