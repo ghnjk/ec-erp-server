@@ -116,13 +116,19 @@ class OrderAnalysis(object):
                     counter.add(inventory_sku, allocated, sku_info)
                 else:
                     # 组合sku
-                    for var_item in var_sku_group_list:
-                        item_sku = var_item["varSku"]
-                        item_num = var_item["num"]
-                        sku_info = self.sku_manager.sku_map.get(item_sku, {})
-                        self.sku_sample_desc[item_sku] = self._build_sample_desc(
-                            inventory_sku, allocated, item_sku, allocated * item_num
-                        )
+                    note = self.backend.get_sku_picking_note(inventory_sku)
+                    if note is not None:
+                        # 不能拆分的组合sku
+                        sku_info = self.sku_manager.sku_map.get(inventory_sku, {})
+                        counter.add(inventory_sku, allocated, sku_info)
+                    else:
+                        for var_item in var_sku_group_list:
+                            item_sku = var_item["varSku"]
+                            item_num = var_item["num"]
+                            sku_info = self.sku_manager.sku_map.get(item_sku, {})
+                            self.sku_sample_desc[item_sku] = self._build_sample_desc(
+                                inventory_sku, allocated, item_sku, allocated * item_num
+                            )
                         counter.add(item_sku, allocated * item_num, sku_info)
             order["sku_match_detail"] = sku_match_detail
             # # 匹配所有sku，转成单一的sku并合并
