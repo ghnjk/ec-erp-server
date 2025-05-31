@@ -287,8 +287,9 @@ def search_manual_mark_sku_picking_note():
     current_page = request_util.get_int_param("current_page")
     sku_manager = big_seller_util.build_sku_manager()
     page_size = request_util.get_int_param("page_size")
+    search_sku = request_util.get_str_param("search_sku")
     offset = (current_page - 1) * page_size
-    total, records = request_context.get_backend().search_sku_picking_note(offset, page_size)
+    total, records = request_context.get_backend().search_sku_picking_note(search_sku, offset, page_size)
     res_list = []
     for r in records:
         item = DtoUtil.to_dict(r)

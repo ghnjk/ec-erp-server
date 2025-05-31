@@ -914,10 +914,12 @@ class MysqlBackend(object):
         session.close()
         return note
 
-    def search_sku_picking_note(self, offset: int, limit: int) -> typing.Tuple[int, typing.List[SkuPickingNote]]:
+    def search_sku_picking_note(self, sku: str, offset: int, limit: int) -> typing.Tuple[int, typing.List[SkuPickingNote]]:
         session = self.DBSession()
         q = session.query(SkuPickingNote).filter(SkuPickingNote.project_id == self.project_id).order_by(
             SkuPickingNote.sku.asc())
+        if sku is not None and sku.strip() != "":
+            q = q.filter(SkuPickingNote.sku.like(f"%{sku}%"))
         total = q.count()
         q = q.offset(offset).limit(limit)
         records = q.all()
