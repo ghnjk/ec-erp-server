@@ -119,6 +119,14 @@ class OrderAnalysis(object):
                     note = self.backend.get_sku_picking_note(inventory_sku)
                     if note is not None:
                         # 不能拆分的组合sku
+                        if "not_split_var_skus" not in order:
+                            order["not_split_var_skus"] = []
+                        order["not_split_var_skus"].append({
+                            "inventory_sku": inventory_sku,
+                            "allocated": allocated,
+                            "sku_info": sku_info,
+                            "note": DtoUtil.to_dict(note)
+                        })
                         sku_info = self.sku_manager.sku_map.get(inventory_sku, {})
                         counter.add(inventory_sku, allocated, sku_info)
                     else:
