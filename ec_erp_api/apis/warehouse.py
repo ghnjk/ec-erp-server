@@ -137,7 +137,7 @@ class OrderAnalysis(object):
                             self.sku_sample_desc[item_sku] = self._build_sample_desc(
                                 inventory_sku, allocated, item_sku, allocated * item_num
                             )
-                        counter.add(item_sku, allocated * item_num, sku_info)
+                            counter.add(item_sku, allocated * item_num, sku_info)
             order["sku_match_detail"] = sku_match_detail
             # # 匹配所有sku，转成单一的sku并合并
             # for item in order["orderItemList"]:
