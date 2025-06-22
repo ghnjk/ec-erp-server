@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-conda activate ec_erp_env
+# conda activate ec_erp_env
 
 mkdir -p logs
 
