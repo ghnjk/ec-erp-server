@@ -38,7 +38,7 @@ def add_user():
             },
             {
                 "project_id": project_id,
-                "name": "storehouse",
+                "name": "warehouse",
                 "memo": "仓库管理",
                 "level": 1
             }
