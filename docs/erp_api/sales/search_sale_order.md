@@ -26,7 +26,7 @@
 | traceId | long | 追踪ID |
 | data | object | 分页数据 |
 | ∟ total | int | 总记录数 |
-| ∟ records | array | 销售订单列表 |
+| ∟ list | array | 销售订单列表 |
 | &nbsp;&nbsp;∟ order_id | int | 订单ID |
 | &nbsp;&nbsp;∟ order_date | string | 订单日期 |
 | &nbsp;&nbsp;∟ sale_sku_list | array | 销售SKU列表 |
@@ -80,7 +80,7 @@
 {
   "data": {
     "total": 25,
-    "records": [
+    "list": [
       {
         "order_id": 1001,
         "order_date": "2024-10-05 15:30:00",

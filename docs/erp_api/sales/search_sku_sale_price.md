@@ -24,7 +24,7 @@
 | traceId | long | 追踪ID |
 | data | object | 分页数据 |
 | ∟ total | int | 总记录数 |
-| ∟ records | array | SKU销售价格列表 |
+| ∟ list | array | SKU销售价格列表 |
 | &nbsp;&nbsp;∟ project_id | string | 所属项目ID |
 | &nbsp;&nbsp;∟ sku | string | SKU编码 |
 | &nbsp;&nbsp;∟ unit_price | float | 销售单价 |
@@ -55,7 +55,7 @@
 {
   "data": {
     "total": 15,
-    "records": [
+    "list": [
       {
         "project_id": "philipine",
         "sku": "A-1-Golden-Maple leaf",
