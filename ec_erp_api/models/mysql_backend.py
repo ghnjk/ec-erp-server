@@ -437,6 +437,47 @@ class OrderPrintTask(DtoBase):
     ]
 
 
+class SkuSalePrice(DtoBase):
+    """
+    商品销售价格
+    """
+    __tablename__ = "t_sku_sale_price"
+    __table_args__ = {"mysql_default_charset": "utf8"}
+    sku: Mapped[str] = Column('Fsku', String(128), primary_key=True, comment='商品SKU')
+    unit_price: Mapped[float] = Column('Funit_price', Float, comment='单价')
+    create_time: Mapped[datetime] = Column('Fcreate_time', DateTime, index=True, default=datetime.now(),
+                                           server_default=sql.func.now(), comment='创建时间')
+    modify_time: Mapped[datetime] = Column('Fmodify_time', DateTime, index=True, default=datetime.now(),
+                                           server_default=sql.func.now(), comment='修改时间')
+    columns = [
+        "sku", "unit_price", "create_time", "modify_time"
+    ]
+
+
+class SaleOrder(DtoBase):
+    """
+    销售订单
+    """
+    __tablename__ = "t_sale_order"
+    __table_args__ = {"mysql_default_charset": "utf8"}
+    order_id: Mapped[int] = Column('Forder_id', Integer, primary_key=True, autoincrement=True, comment='订单ID')
+    order_date: Mapped[datetime] = Column('Forder_date', DateTime, comment='订单日期')
+    sku: Mapped[str] = Column('Fsku', String(128), comment='商品SKU')
+    unit_price: Mapped[float] = Column('Funit_price', Float, comment='单价')
+    quantity: Mapped[int] = Column('Fquantity', Integer, comment='数量')
+    total_amount: Mapped[float] = Column('Ftotal_amount', Float, comment='订单金额')
+    status: Mapped[str] = Column('Fstatus', String(128), comment='订单状态， 待同步、已同步')
+    create_time: Mapped[datetime] = Column('Fcreate_time', DateTime, index=True, default=datetime.now(),
+                                           server_default=sql.func.now(), comment='创建时间')
+    modify_time: Mapped[datetime] = Column('Fmodify_time', DateTime, index=True, default=datetime.now(),
+                                           server_default=sql.func.now(), comment='修改时间')
+
+    columns = [
+        "order_id", "order_date", "sku", "unit_price", "quantity", "total_amount", "status",
+        "create_time", "modify_time"
+    ]
+
+
 class MysqlBackend(object):
     """
         状态后端接口
@@ -1056,6 +1097,183 @@ class MysqlBackend(object):
             logger.error(f"update_order_print_task_without_order_list OrderPrintTask sku {task.task_id}"
                          f"  failed: {e}")
             raise
+
+    # ==================== SKU销售价格相关方法 ====================
+    def _get_sku_sale_price(self, session, sku: str) -> typing.Optional[SkuSalePrice]:
+        """
+        获取SKU销售价格
+        """
+        try:
+            record: SkuSalePrice = session.query(SkuSalePrice).filter(
+                SkuSalePrice.sku == sku
+            ).one()
+            return record
+        except NoResultFound:
+            return None
+
+    def store_sku_sale_price(self, sku_sale_price: SkuSalePrice):
+        """
+        保存或更新SKU销售价格
+        """
+        session = self.DBSession()
+        try:
+            # 查询db是否有这个记录
+            db_dto = self._get_sku_sale_price(session, sku_sale_price.sku)
+            # 备份记录
+            if db_dto is not None:
+                sku_sale_price.create_time = db_dto.create_time
+                DtoUtil.copy(sku_sale_price, db_dto)
+                db_dto.modify_time = datetime.now()
+                session.add(db_dto)
+            else:
+                # 构建新的dto
+                sku_sale_price.create_time = datetime.now()
+                sku_sale_price.modify_time = datetime.now()
+                session.add(sku_sale_price)
+            # 提交事务
+            session.commit()
+            session.close()
+        except Exception as e:
+            session.rollback()
+            session.close()
+            logger.error(f"store sku_sale_price sku {sku_sale_price.sku} failed: {e}")
+            raise
+
+    def get_sku_sale_price(self, sku: str) -> typing.Optional[SkuSalePrice]:
+        """
+        获取SKU销售价格
+        """
+        session = self.DBSession()
+        price = self._get_sku_sale_price(session, sku)
+        session.close()
+        return price
+
+    def search_sku_sale_price(self, sku: typing.Optional[str], offset: int, limit: int) -> typing.Tuple[int, typing.List[SkuSalePrice]]:
+        """
+        搜索SKU销售价格
+        """
+        session = self.DBSession()
+        q = session.query(SkuSalePrice)
+        if sku is not None and sku != "":
+            q = q.filter(SkuSalePrice.sku.like(f"%{sku}%"))
+        q = q.order_by(SkuSalePrice.modify_time.desc())
+        total = q.count()
+        q = q.offset(offset).limit(limit)
+        records = q.all()
+        session.close()
+        return total, records
+
+    # ==================== 销售订单相关方法 ====================
+    def _get_sale_order(self, session, order_id: int) -> typing.Optional[SaleOrder]:
+        """
+        获取销售订单
+        """
+        try:
+            record: SaleOrder = session.query(SaleOrder).filter(
+                SaleOrder.order_id == order_id
+            ).one()
+            return record
+        except NoResultFound:
+            return None
+
+    def create_sale_order(self, sale_order: SaleOrder):
+        """
+        创建销售订单
+        """
+        session = self.DBSession()
+        try:
+            # 构建新的dto
+            sale_order.order_id = None
+            sale_order.create_time = datetime.now()
+            sale_order.modify_time = datetime.now()
+            session.add(sale_order)
+            # 提交事务
+            session.commit()
+            order_id = sale_order.order_id
+            session.close()
+            return order_id
+        except Exception as e:
+            session.rollback()
+            session.close()
+            logger.error(f"create sale_order failed: {e}")
+            raise
+
+    def update_sale_order(self, sale_order: SaleOrder):
+        """
+        更新销售订单
+        """
+        session = self.DBSession()
+        try:
+            # 查询db是否有这个记录
+            db_dto = self._get_sale_order(session, sale_order.order_id)
+            if db_dto is None:
+                raise Exception(f"订单不存在: {sale_order.order_id}")
+            # 更新记录
+            sale_order.create_time = db_dto.create_time
+            DtoUtil.copy(sale_order, db_dto)
+            db_dto.modify_time = datetime.now()
+            session.add(db_dto)
+            # 提交事务
+            session.commit()
+            session.close()
+        except Exception as e:
+            session.rollback()
+            session.close()
+            logger.error(f"update sale_order order_id {sale_order.order_id} failed: {e}")
+            raise
+
+    def delete_sale_order(self, order_id: int):
+        """
+        删除销售订单
+        """
+        session = self.DBSession()
+        try:
+            # 查询db是否有这个记录
+            db_dto = self._get_sale_order(session, order_id)
+            if db_dto is None:
+                raise Exception(f"订单不存在: {order_id}")
+            # 删除记录
+            session.delete(db_dto)
+            # 提交事务
+            session.commit()
+            session.close()
+        except Exception as e:
+            session.rollback()
+            session.close()
+            logger.error(f"delete sale_order order_id {order_id} failed: {e}")
+            raise
+
+    def get_sale_order(self, order_id: int) -> typing.Optional[SaleOrder]:
+        """
+        获取销售订单
+        """
+        session = self.DBSession()
+        order = self._get_sale_order(session, order_id)
+        session.close()
+        return order
+
+    def search_sale_order(self, sku: typing.Optional[str], status: typing.Optional[str], 
+                         begin_date: typing.Optional[str], end_date: typing.Optional[str],
+                         offset: int, limit: int) -> typing.Tuple[int, typing.List[SaleOrder]]:
+        """
+        搜索销售订单
+        """
+        session = self.DBSession()
+        q = session.query(SaleOrder)
+        if sku is not None and sku != "":
+            q = q.filter(SaleOrder.sku.like(f"%{sku}%"))
+        if status is not None and status != "":
+            q = q.filter(SaleOrder.status == status)
+        if begin_date is not None and begin_date != "":
+            q = q.filter(SaleOrder.order_date >= begin_date)
+        if end_date is not None and end_date != "":
+            q = q.filter(SaleOrder.order_date <= end_date)
+        q = q.order_by(SaleOrder.order_id.desc())
+        total = q.count()
+        q = q.offset(offset).limit(limit)
+        records = q.all()
+        session.close()
+        return total, records
 
 
 def main():

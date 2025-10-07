@@ -17,6 +17,7 @@ def create_app():
     from ec_erp_api.apis.system import system_apis
     from ec_erp_api.apis.supplier import supplier_apis
     from ec_erp_api.apis.warehouse import warehouse_apis
+    from ec_erp_api.apis.sale import sale_apis
     set_file_logger("logs/acc.log", logger=logging.getLogger("ACC"))
     set_file_logger("logs/async_task.log", logger=logging.getLogger("ASYNC_TASK"))
     set_file_logger("logs/invoker.log", logger=logging.getLogger("INVOKER"))
@@ -27,6 +28,7 @@ def create_app():
     app.register_blueprint(system_apis, url_prefix="/erp_api/system")
     app.register_blueprint(supplier_apis, url_prefix="/erp_api/supplier")
     app.register_blueprint(warehouse_apis, url_prefix="/erp_api/warehouse")
+    app.register_blueprint(sale_apis, url_prefix="/erp_api/sale")
     return app
 
 
