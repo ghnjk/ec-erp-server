@@ -381,5 +381,9 @@ def search_sale_order():
             record_dict["sale_sku_list"] = []
         records_dict.append(record_dict)
     
-    return response_util.pack_pagination_result(total, records_dict)
+    # 直接返回格式化结果，因为records_dict已经是字典列表了
+    return response_util.pack_json_response({
+        "total": total,
+        "list": records_dict
+    })
 
