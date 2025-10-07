@@ -442,15 +442,20 @@ class SkuSalePrice(DtoBase):
     商品销售价格
     """
     __tablename__ = "t_sku_sale_price"
-    __table_args__ = {"mysql_default_charset": "utf8"}
-    sku: Mapped[str] = Column('Fsku', String(128), primary_key=True, comment='商品SKU')
+    __table_args__ = (PrimaryKeyConstraint(
+        "Fproject_id", "Fsku"
+    ), {
+        "mysql_default_charset": "utf8"
+    })
+    project_id: Mapped[str] = Column('Fproject_id', String(128), comment='所属项目ID')
+    sku: Mapped[str] = Column('Fsku', String(128), comment='商品SKU')
     unit_price: Mapped[float] = Column('Funit_price', Float, comment='单价')
     create_time: Mapped[datetime] = Column('Fcreate_time', DateTime, index=True, default=datetime.now(),
                                            server_default=sql.func.now(), comment='创建时间')
     modify_time: Mapped[datetime] = Column('Fmodify_time', DateTime, index=True, default=datetime.now(),
                                            server_default=sql.func.now(), comment='修改时间')
     columns = [
-        "sku", "unit_price", "create_time", "modify_time"
+        "project_id", "sku", "unit_price", "create_time", "modify_time"
     ]
 
 
@@ -460,6 +465,7 @@ class SaleOrder(DtoBase):
     """
     __tablename__ = "t_sale_order"
     __table_args__ = {"mysql_default_charset": "utf8"}
+    project_id: Mapped[str] = Column('Fproject_id', String(128), index=True, comment='所属项目ID')
     order_id: Mapped[int] = Column('Forder_id', Integer, primary_key=True, autoincrement=True, comment='订单ID')
     order_date: Mapped[datetime] = Column('Forder_date', DateTime, comment='订单日期')
     sale_sku_list: Mapped[str] = Column('Fsale_sku_list', JSON, comment='销售SKU列表，包含sku, sku_group, sku_name, erp_sku_image_url, unit_price, quantity, total_amount')
@@ -472,7 +478,7 @@ class SaleOrder(DtoBase):
                                            server_default=sql.func.now(), comment='修改时间')
 
     columns = [
-        "order_id", "order_date", "sale_sku_list", "total_amount", "status", "is_delete",
+        "project_id", "order_id", "order_date", "sale_sku_list", "total_amount", "status", "is_delete",
         "create_time", "modify_time"
     ]
 
@@ -1104,6 +1110,8 @@ class MysqlBackend(object):
         """
         try:
             record: SkuSalePrice = session.query(SkuSalePrice).filter(
+                SkuSalePrice.project_id == self.project_id
+            ).filter(
                 SkuSalePrice.sku == sku
             ).one()
             return record
@@ -1114,6 +1122,8 @@ class MysqlBackend(object):
         """
         保存或更新SKU销售价格
         """
+        if sku_sale_price.project_id != self.project_id:
+            raise Exception("sku_sale_price project 非本项目数据")
         session = self.DBSession()
         try:
             # 查询db是否有这个记录
@@ -1152,7 +1162,7 @@ class MysqlBackend(object):
         搜索SKU销售价格
         """
         session = self.DBSession()
-        q = session.query(SkuSalePrice)
+        q = session.query(SkuSalePrice).filter(SkuSalePrice.project_id == self.project_id)
         if sku is not None and sku != "":
             q = q.filter(SkuSalePrice.sku.like(f"%{sku}%"))
         q = q.order_by(SkuSalePrice.modify_time.desc())
@@ -1169,6 +1179,8 @@ class MysqlBackend(object):
         """
         try:
             record: SaleOrder = session.query(SaleOrder).filter(
+                SaleOrder.project_id == self.project_id
+            ).filter(
                 SaleOrder.order_id == order_id
             ).one()
             return record
@@ -1179,6 +1191,8 @@ class MysqlBackend(object):
         """
         创建销售订单
         """
+        if sale_order.project_id != self.project_id:
+            raise Exception("sale_order project 非本项目数据")
         session = self.DBSession()
         try:
             # 构建新的dto
@@ -1201,6 +1215,8 @@ class MysqlBackend(object):
         """
         更新销售订单
         """
+        if sale_order.project_id != self.project_id:
+            raise Exception("sale_order project 非本项目数据")
         session = self.DBSession()
         try:
             # 查询db是否有这个记录
@@ -1260,7 +1276,11 @@ class MysqlBackend(object):
         搜索销售订单（只返回未删除的订单）
         """
         session = self.DBSession()
-        q = session.query(SaleOrder).filter(SaleOrder.is_delete == 0)
+        q = session.query(SaleOrder).filter(
+            SaleOrder.project_id == self.project_id
+        ).filter(
+            SaleOrder.is_delete == 0
+        )
         if status is not None and status != "":
             q = q.filter(SaleOrder.status == status)
         if begin_date is not None and begin_date != "":

@@ -53,6 +53,7 @@ Sales模块主要负责：
 
 | 字段名 | 类型 | 说明 |
 |--------|------|------|
+| Fproject_id | VARCHAR(128) | 所属项目ID（主键） |
 | Fsku | VARCHAR(128) | SKU编码（主键） |
 | Funit_price | FLOAT | 销售单价 |
 | Fcreate_time | DATETIME | 创建时间 |
@@ -62,9 +63,10 @@ Sales模块主要负责：
 
 | 字段名 | 类型 | 说明 |
 |--------|------|------|
+| Fproject_id | VARCHAR(128) | 所属项目ID |
 | Forder_id | INT | 订单ID（主键、自增） |
 | Forder_date | DATETIME | 订单日期 |
-| Fsku | VARCHAR(128) | 商品SKU |
+| Fsale_sku_list | JSON | 销售SKU列表 |
 | Funit_price | FLOAT | 单价 |
 | Fquantity | INT | 数量 |
 | Ftotal_amount | FLOAT | 订单总金额 |

@@ -66,6 +66,7 @@ def api_post_request():
         @functools.wraps(func)
         def wrapper(*args, **kw):
             logger = logging.getLogger("ACC")
+            error_logger = logging.getLogger("ERROR")
             start = time.time()
             api_request = request.json
             trace_id = f"TRACE_{time.time()}"
@@ -76,6 +77,8 @@ def api_post_request():
             except Exception as e:
                 logger.error(f"EXCEPTION {trace_id} process oms request error: {e}")
                 logger.error(traceback.format_exc())
+                error_logger.error(f"EXCEPTION {trace_id} process oms request error: {e}")
+                error_logger.error(traceback.format_exc())
                 api_response = {
                     "result": "1001",
                     "resultMsg": str(e),

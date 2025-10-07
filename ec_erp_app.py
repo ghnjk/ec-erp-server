@@ -19,6 +19,7 @@ def create_app():
     from ec_erp_api.apis.warehouse import warehouse_apis
     from ec_erp_api.apis.sale import sale_apis
     set_file_logger("logs/acc.log", logger=logging.getLogger("ACC"))
+    set_file_logger("logs/error.log", logger=logging.getLogger("ERROR"))
     set_file_logger("logs/async_task.log", logger=logging.getLogger("ASYNC_TASK"))
     set_file_logger("logs/invoker.log", logger=logging.getLogger("INVOKER"))
     set_file_logger("logs/sql.log", logger=logging.getLogger("sqlalchemy.engine"))

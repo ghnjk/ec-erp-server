@@ -25,6 +25,7 @@
 | data | object | 分页数据 |
 | ∟ total | int | 总记录数 |
 | ∟ records | array | SKU销售价格列表 |
+| &nbsp;&nbsp;∟ project_id | string | 所属项目ID |
 | &nbsp;&nbsp;∟ sku | string | SKU编码 |
 | &nbsp;&nbsp;∟ unit_price | float | 销售单价 |
 | &nbsp;&nbsp;∟ create_time | string | 创建时间 |
@@ -56,12 +57,14 @@
     "total": 15,
     "records": [
       {
+        "project_id": "philipine",
         "sku": "A-1-Golden-Maple leaf",
         "unit_price": 150.5,
         "create_time": "2024-10-01 10:30:00",
         "modify_time": "2024-10-05 15:20:00"
       },
       {
+        "project_id": "philipine",
         "sku": "A-2-Golden-Oak leaf",
         "unit_price": 180.0,
         "create_time": "2024-10-02 11:20:00",
@@ -90,6 +93,7 @@
 1. 验证用户权限
 2. 获取搜索参数（sku、分页参数）
 3. 从数据库查询SKU销售价格
+   - 自动过滤当前项目的数据（project_id）
    - 如果提供了sku参数，使用模糊搜索（LIKE）
    - 按修改时间倒序排列
    - 应用分页参数
@@ -99,8 +103,9 @@
 
 ## 注意事项
 
+- 查询结果会自动过滤为当前登录用户所属项目的数据
 - SKU参数支持模糊搜索，会匹配SKU编码中包含该关键字的所有记录
 - 结果按修改时间倒序排列，最新修改的记录在最前面
-- 如果不提供sku参数，会返回所有SKU的销售价格
+- 如果不提供sku参数，会返回当前项目所有SKU的销售价格
 - 分页从1开始计数
 

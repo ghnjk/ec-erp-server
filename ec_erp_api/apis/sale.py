@@ -42,8 +42,12 @@ def save_sku_sale_price():
     if unit_price is None or unit_price <= 0:
         return response_util.pack_error_response(1003, "unit_price参数必须大于0")
     
+    # 获取当前项目ID
+    project_id = request_context.get_current_project_id()
+    
     # 创建或更新SKU销售价格
     sku_sale_price = SkuSalePrice(
+        project_id=project_id,
         sku=sku,
         unit_price=unit_price
     )
@@ -152,8 +156,12 @@ def create_sale_order():
         except:
             return response_util.pack_error_response(1003, "order_date格式错误，应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS")
     
+    # 获取当前项目ID
+    project_id = request_context.get_current_project_id()
+    
     # 创建销售订单
     sale_order = SaleOrder(
+        project_id=project_id,
         order_date=order_date,
         sale_sku_list=json.dumps(validated_sku_list, ensure_ascii=False),
         total_amount=total_amount,
@@ -188,6 +196,9 @@ def update_sale_order():
     existing_order = backend.get_sale_order(order_id)
     if existing_order is None:
         return response_util.pack_error_response(1004, f"订单不存在: {order_id}")
+    
+    # 确保project_id一致
+    existing_order.project_id = request_context.get_current_project_id()
     
     # 获取更新参数
     order_date_str = request_util.get_str_param("order_date")

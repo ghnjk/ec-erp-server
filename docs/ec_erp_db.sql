@@ -236,11 +236,12 @@ CREATE TABLE IF NOT EXISTS `t_order_print_task` (
 -- 10. SKU销售价格表
 -- ========================================
 CREATE TABLE IF NOT EXISTS `t_sku_sale_price` (
+  `Fproject_id` VARCHAR(128) NOT NULL COMMENT '所属项目ID',
   `Fsku` VARCHAR(128) NOT NULL COMMENT '商品SKU',
   `Funit_price` FLOAT COMMENT '单价',
   `Fcreate_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `Fmodify_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
-  PRIMARY KEY (`Fsku`),
+  PRIMARY KEY (`Fproject_id`, `Fsku`),
   KEY `idx_create_time` (`Fcreate_time`),
   KEY `idx_modify_time` (`Fmodify_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='SKU销售价格表';
@@ -249,6 +250,7 @@ CREATE TABLE IF NOT EXISTS `t_sku_sale_price` (
 -- 11. 销售订单表
 -- ========================================
 CREATE TABLE IF NOT EXISTS `t_sale_order` (
+  `Fproject_id` VARCHAR(128) NOT NULL COMMENT '所属项目ID',
   `Forder_id` INT NOT NULL AUTO_INCREMENT COMMENT '订单ID',
   `Forder_date` DATETIME COMMENT '订单日期',
   `Fsale_sku_list` JSON COMMENT '销售SKU列表，包含sku, sku_group, sku_name, erp_sku_image_url, unit_price, quantity, total_amount',
@@ -258,6 +260,7 @@ CREATE TABLE IF NOT EXISTS `t_sale_order` (
   `Fcreate_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `Fmodify_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
   PRIMARY KEY (`Forder_id`),
+  KEY `idx_project_id` (`Fproject_id`),
   KEY `idx_order_date` (`Forder_date`),
   KEY `idx_status` (`Fstatus`),
   KEY `idx_is_delete` (`Fis_delete`),
