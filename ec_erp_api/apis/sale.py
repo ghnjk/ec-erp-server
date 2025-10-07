@@ -85,7 +85,11 @@ def search_sku_sale_price():
     # 转换为字典
     records_dict = [DtoUtil.to_dict(record) for record in records]
     
-    return response_util.pack_pagination_result(total, records_dict)
+    # 直接返回格式化结果，因为records_dict已经是字典列表了
+    return response_util.pack_json_response({
+        "total": total,
+        "list": records_dict
+    })
 
 
 @sale_apis.route('/create_sale_order', methods=["POST"])
