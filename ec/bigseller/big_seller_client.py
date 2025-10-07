@@ -302,7 +302,7 @@ class BigSellerClient:
             }
           ],
           "id": "",
-          "inoutTypeId": "1001", // 1001 普通入库 1004 退货入库
+          "inoutTypeId": "1001", // 1001 普通入库 1002 普通出库 1004 退货入库
           "isAutoInoutStock": 1,
           "note": "test",
           "warehouseId": 27763,
@@ -325,7 +325,7 @@ class BigSellerClient:
         if res["code"] != 0:
             raise Exception("add_stock_to_erp failed: http response msg: " + res["msg"])
         return res["data"]["data"]
-
+    
     def query_shop_group(self):
         """
         查询店铺分组信息

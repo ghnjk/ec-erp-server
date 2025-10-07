@@ -21,9 +21,10 @@ from ec_erp_api.models.mysql_backend import (
     PurchaseOrder, SkuDto, SkuPurchasePriceDto, DtoUtil, SkuSalePrice, SaleOrder
 )
 import json
+import logging
 
 sale_apis = Blueprint('sale', __name__)
-
+error_logger = logging.getLogger("ERROR")
 
 @sale_apis.route('/save_sku_sale_price', methods=["POST"])
 @api_post_request()
@@ -304,11 +305,93 @@ def delete_sale_order():
     return response_util.pack_simple_response()
 
 
+def sync_sale_order_to_erp(order: SaleOrder):
+    """
+    同步销售订单出库到ERP
+    参考sync_stock_to_erp的实现，但使用出库类型1002
+    """
+    config = get_app_config()
+    cookies_dir = config.get("cookies_dir", "../cookies")
+    client = BigSellerClient(config["ydm_token"], cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))
+    client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+    
+    sync_id = f"OUT-EC-{order.order_id}"
+    stock_list = []
+    
+    # 解析sale_sku_list（JSON字符串）
+    try:
+        sale_sku_list = json.loads(order.sale_sku_list) if isinstance(order.sale_sku_list, str) else order.sale_sku_list
+    except Exception as e:
+        error_logger.error(f"sync_sale_order_to_erp parse sale_sku_list failed: {e}", exc_info=True)
+        print(f"sync_sale_order_to_erp parse sale_sku_list failed: {e}")
+        return response_util.pack_error_response(1004, f"解析SKU列表失败: {str(e)}")
+    
+    # 遍历SKU构建出库列表
+    for item in sale_sku_list:
+        sku = item.get("sku")
+        if not sku:
+            continue
+        
+        print(f"sync_sale_order_to_erp add sku {sku}")
+        sku_info = request_context.get_backend().get_sku(sku)
+        
+        if sku_info is None:
+            print(f"sync_sale_order_to_erp sku {sku} not found in database")
+            return response_util.pack_error_response(1004, f"SKU {sku} 未找到")
+        
+        if not sku_info.erp_sku_id:
+            print(f"sync_sale_order_to_erp sku {sku} has no erp_sku_id")
+            return response_util.pack_error_response(1004, f"SKU {sku} 没有关联的ERP SKU ID")
+        
+        stock_list.append({
+            "skuId": int(sku_info.erp_sku_id),
+            "stockPrice": None, 
+            "shelfList": [
+                {
+                    "shelfId": config["big_seller_shelf_id"],
+                    "shelfName": config["big_seller_shelf_name"],
+                    "stockQty": int(item.get("quantity", 0))  # 销售数量
+                }
+            ]
+        })
+    
+    if len(stock_list) == 0:
+        print("sync_sale_order_to_erp no valid sku to sync")
+        return response_util.pack_error_response(1004, "没有有效的SKU需要出库")
+    
+    # 构建出库请求（inoutTypeId为1002表示普通出库）
+    req = {
+        "detailsAddBoList": stock_list,
+        "id": "",
+        "inoutTypeId": "1002",  # 1002 普通出库
+        "isAutoInoutStock": 1,
+        "note": f"ec-erp 销售订单：{order.order_id} [出库单={sync_id}]",
+        "warehouseId": config["big_seller_warehouse_id"],
+        "zoneId": None
+    }
+    
+    print("sync_sale_order_to_erp req: ", json.dumps(req))
+    res = client.add_stock_to_erp(req)
+    print("sync_sale_order_to_erp res: ", json.dumps(res))
+    
+    success = res["successNum"]
+    fail = res["failNum"]
+    print(f"同步到ERP仓库出库： 成功： {success} 失败： {fail}")
+    
+    if fail > 0:
+        return response_util.pack_error_response(1004, f"同步到ERP仓库出库： 成功： {success} 失败： {fail}")
+    
+    # 返回None表示成功
+    return None
+
+
 @sale_apis.route('/submit_sale_order', methods=["POST"])
 @api_post_request()
 def submit_sale_order():
     """
-    确认提交销售订单（将状态从"待同步"改为"已同步"）
+    确认提交销售订单：
+    1：将销售的订单信息，通过add_stock_to_erp接口同步到erp(1002出库)
+    2：（将状态从"待同步"改为"已同步"）
     """
     if not request_context.validate_user_permission(request_context.PMS_SALE):
         return response_util.pack_error_response(1008, "权限不足")
@@ -327,6 +410,16 @@ def submit_sale_order():
     # 检查订单状态
     if existing_order.status == "已同步":
         return response_util.pack_error_response(1005, "订单已经提交过了")
+    
+    # 同步出库到ERP
+    try:
+        sync_result = sync_sale_order_to_erp(existing_order)
+        if sync_result is not None:
+            # 同步失败，返回错误信息
+            return sync_result
+    except Exception as e:
+        error_logger.error(f"同步到ERP失败: {str(e)}", exc_info=True)
+        return response_util.pack_error_response(1006, f"同步到ERP失败: {str(e)}")
     
     # 更新状态为已同步
     existing_order.status = "已同步"
