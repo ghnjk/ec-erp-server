@@ -41,6 +41,16 @@ def get_int_param(key: str, default_value: typing.Optional[int] = None) -> typin
     return int(request.json["body"][key])
 
 
+def get_float_param(key: str, default_value: typing.Optional[float] = None) -> typing.Optional[float]:
+    if key not in request.json.get("body", {}):
+        return default_value
+    if request.json["body"][key] is None:
+        return default_value
+    if request.json["body"][key] == "":
+        return default_value
+    return float(request.json["body"][key])
+
+
 def get_param(key: str, default_value=None):
     if key not in request.json.get("body", {}):
         return default_value
