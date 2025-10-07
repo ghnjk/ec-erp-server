@@ -43,6 +43,17 @@ def pack_json_response(data: dict, result: int = 0, result_msg: str = "success")
     }
 
 
+def pack_simple_response(data: dict = None):
+    """
+    返回简单的成功响应
+    :param data: 响应数据，如果为None则返回空字典
+    :return: 响应字典
+    """
+    if data is None:
+        data = {}
+    return pack_response(data)
+
+
 def pack_pagination_result(total: int, records):
     return {
         "result": 0,
