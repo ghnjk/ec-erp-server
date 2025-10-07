@@ -462,18 +462,17 @@ class SaleOrder(DtoBase):
     __table_args__ = {"mysql_default_charset": "utf8"}
     order_id: Mapped[int] = Column('Forder_id', Integer, primary_key=True, autoincrement=True, comment='订单ID')
     order_date: Mapped[datetime] = Column('Forder_date', DateTime, comment='订单日期')
-    sku: Mapped[str] = Column('Fsku', String(128), comment='商品SKU')
-    unit_price: Mapped[float] = Column('Funit_price', Float, comment='单价')
-    quantity: Mapped[int] = Column('Fquantity', Integer, comment='数量')
-    total_amount: Mapped[float] = Column('Ftotal_amount', Float, comment='订单金额')
+    sale_sku_list: Mapped[str] = Column('Fsale_sku_list', JSON, comment='销售SKU列表，包含sku, sku_group, sku_name, erp_sku_image_url, unit_price, quantity, total_amount')
+    total_amount: Mapped[float] = Column('Ftotal_amount', Float, comment='订单总金额')
     status: Mapped[str] = Column('Fstatus', String(128), comment='订单状态， 待同步、已同步')
+    is_delete: Mapped[int] = Column('Fis_delete', Integer, index=True, default=0, server_default='0', comment='是否逻辑删除, 1: 删除')
     create_time: Mapped[datetime] = Column('Fcreate_time', DateTime, index=True, default=datetime.now(),
                                            server_default=sql.func.now(), comment='创建时间')
     modify_time: Mapped[datetime] = Column('Fmodify_time', DateTime, index=True, default=datetime.now(),
                                            server_default=sql.func.now(), comment='修改时间')
 
     columns = [
-        "order_id", "order_date", "sku", "unit_price", "quantity", "total_amount", "status",
+        "order_id", "order_date", "sale_sku_list", "total_amount", "status", "is_delete",
         "create_time", "modify_time"
     ]
 
@@ -1224,7 +1223,7 @@ class MysqlBackend(object):
 
     def delete_sale_order(self, order_id: int):
         """
-        删除销售订单
+        逻辑删除销售订单
         """
         session = self.DBSession()
         try:
@@ -1232,8 +1231,10 @@ class MysqlBackend(object):
             db_dto = self._get_sale_order(session, order_id)
             if db_dto is None:
                 raise Exception(f"订单不存在: {order_id}")
-            # 删除记录
-            session.delete(db_dto)
+            # 逻辑删除记录
+            db_dto.is_delete = 1
+            db_dto.modify_time = datetime.now()
+            session.add(db_dto)
             # 提交事务
             session.commit()
             session.close()
@@ -1252,16 +1253,14 @@ class MysqlBackend(object):
         session.close()
         return order
 
-    def search_sale_order(self, sku: typing.Optional[str], status: typing.Optional[str], 
+    def search_sale_order(self, status: typing.Optional[str], 
                          begin_date: typing.Optional[str], end_date: typing.Optional[str],
                          offset: int, limit: int) -> typing.Tuple[int, typing.List[SaleOrder]]:
         """
-        搜索销售订单
+        搜索销售订单（只返回未删除的订单）
         """
         session = self.DBSession()
-        q = session.query(SaleOrder)
-        if sku is not None and sku != "":
-            q = q.filter(SaleOrder.sku.like(f"%{sku}%"))
+        q = session.query(SaleOrder).filter(SaleOrder.is_delete == 0)
         if status is not None and status != "":
             q = q.filter(SaleOrder.status == status)
         if begin_date is not None and begin_date != "":

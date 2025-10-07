@@ -98,20 +98,50 @@ def create_sale_order():
     if order_date_str is None or order_date_str == "":
         return response_util.pack_error_response(1003, "order_date参数不能为空")
     
-    sku = request_util.get_str_param("sku")
-    if sku is None or sku == "":
-        return response_util.pack_error_response(1003, "sku参数不能为空")
+    # 获取SKU列表
+    sale_sku_list = request_util.get_param("sale_sku_list")
+    if sale_sku_list is None or not isinstance(sale_sku_list, list) or len(sale_sku_list) == 0:
+        return response_util.pack_error_response(1003, "sale_sku_list参数必须是非空数组")
     
-    unit_price = request_util.get_float_param("unit_price")
-    if unit_price is None or unit_price <= 0:
-        return response_util.pack_error_response(1003, "unit_price参数必须大于0")
+    # 验证并补充SKU列表数据
+    backend = request_context.get_backend()
+    total_amount = 0.0
+    validated_sku_list = []
     
-    quantity = request_util.get_int_param("quantity")
-    if quantity is None or quantity <= 0:
-        return response_util.pack_error_response(1003, "quantity参数必须大于0")
-    
-    # 计算总金额
-    total_amount = unit_price * quantity
+    for idx, sku_item in enumerate(sale_sku_list):
+        if not isinstance(sku_item, dict):
+            return response_util.pack_error_response(1003, f"sale_sku_list[{idx}]必须是对象")
+        
+        sku = sku_item.get("sku")
+        if not sku or sku == "":
+            return response_util.pack_error_response(1003, f"sale_sku_list[{idx}].sku不能为空")
+        
+        unit_price = sku_item.get("unit_price")
+        if unit_price is None or unit_price <= 0:
+            return response_util.pack_error_response(1003, f"sale_sku_list[{idx}].unit_price必须大于0")
+        
+        quantity = sku_item.get("quantity")
+        if quantity is None or quantity <= 0:
+            return response_util.pack_error_response(1003, f"sale_sku_list[{idx}].quantity必须大于0")
+        
+        # 从数据库获取SKU信息补充字段
+        sku_info = backend.get_sku(sku)
+        
+        # 计算该SKU的总金额
+        sku_total_amount = unit_price * quantity
+        total_amount += sku_total_amount
+        
+        # 构建验证后的SKU项
+        validated_sku = {
+            "sku": sku,
+            "sku_group": sku_item.get("sku_group") or (sku_info.sku_group if sku_info else ""),
+            "sku_name": sku_item.get("sku_name") or (sku_info.sku_name if sku_info else ""),
+            "erp_sku_image_url": sku_item.get("erp_sku_image_url") or (sku_info.erp_sku_image_url if sku_info else ""),
+            "unit_price": unit_price,
+            "quantity": quantity,
+            "total_amount": sku_total_amount
+        }
+        validated_sku_list.append(validated_sku)
     
     # 解析订单日期
     try:
@@ -125,14 +155,12 @@ def create_sale_order():
     # 创建销售订单
     sale_order = SaleOrder(
         order_date=order_date,
-        sku=sku,
-        unit_price=unit_price,
-        quantity=quantity,
+        sale_sku_list=json.dumps(validated_sku_list, ensure_ascii=False),
         total_amount=total_amount,
-        status="待同步"
+        status="待同步",
+        is_delete=0
     )
     
-    backend = request_context.get_backend()
     order_id = backend.create_sale_order(sale_order)
     
     return response_util.pack_simple_response({
@@ -163,12 +191,10 @@ def update_sale_order():
     
     # 获取更新参数
     order_date_str = request_util.get_str_param("order_date")
-    sku = request_util.get_str_param("sku")
-    unit_price = request_util.get_float_param("unit_price")
-    quantity = request_util.get_int_param("quantity")
+    sale_sku_list = request_util.get_param("sale_sku_list")
     status = request_util.get_str_param("status")
     
-    # 更新字段
+    # 更新订单日期
     if order_date_str is not None and order_date_str != "":
         try:
             order_date = datetime.datetime.strptime(order_date_str, "%Y-%m-%d %H:%M:%S")
@@ -180,20 +206,56 @@ def update_sale_order():
             except:
                 return response_util.pack_error_response(1003, "order_date格式错误，应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS")
     
-    if sku is not None and sku != "":
-        existing_order.sku = sku
+    # 更新SKU列表
+    if sale_sku_list is not None:
+        if not isinstance(sale_sku_list, list) or len(sale_sku_list) == 0:
+            return response_util.pack_error_response(1003, "sale_sku_list参数必须是非空数组")
+        
+        # 验证并补充SKU列表数据
+        total_amount = 0.0
+        validated_sku_list = []
+        
+        for idx, sku_item in enumerate(sale_sku_list):
+            if not isinstance(sku_item, dict):
+                return response_util.pack_error_response(1003, f"sale_sku_list[{idx}]必须是对象")
+            
+            sku = sku_item.get("sku")
+            if not sku or sku == "":
+                return response_util.pack_error_response(1003, f"sale_sku_list[{idx}].sku不能为空")
+            
+            unit_price = sku_item.get("unit_price")
+            if unit_price is None or unit_price <= 0:
+                return response_util.pack_error_response(1003, f"sale_sku_list[{idx}].unit_price必须大于0")
+            
+            quantity = sku_item.get("quantity")
+            if quantity is None or quantity <= 0:
+                return response_util.pack_error_response(1003, f"sale_sku_list[{idx}].quantity必须大于0")
+            
+            # 从数据库获取SKU信息补充字段
+            sku_info = backend.get_sku(sku)
+            
+            # 计算该SKU的总金额
+            sku_total_amount = unit_price * quantity
+            total_amount += sku_total_amount
+            
+            # 构建验证后的SKU项
+            validated_sku = {
+                "sku": sku,
+                "sku_group": sku_item.get("sku_group") or (sku_info.sku_group if sku_info else ""),
+                "sku_name": sku_item.get("sku_name") or (sku_info.sku_name if sku_info else ""),
+                "erp_sku_image_url": sku_item.get("erp_sku_image_url") or (sku_info.erp_sku_image_url if sku_info else ""),
+                "unit_price": unit_price,
+                "quantity": quantity,
+                "total_amount": sku_total_amount
+            }
+            validated_sku_list.append(validated_sku)
+        
+        existing_order.sale_sku_list = json.dumps(validated_sku_list, ensure_ascii=False)
+        existing_order.total_amount = total_amount
     
-    if unit_price is not None and unit_price > 0:
-        existing_order.unit_price = unit_price
-    
-    if quantity is not None and quantity > 0:
-        existing_order.quantity = quantity
-    
+    # 更新状态
     if status is not None and status != "":
         existing_order.status = status
-    
-    # 重新计算总金额
-    existing_order.total_amount = existing_order.unit_price * existing_order.quantity
     
     # 更新订单
     backend.update_sale_order(existing_order)
@@ -267,12 +329,6 @@ def search_sale_order():
     if not request_context.validate_user_permission(request_context.PMS_SALE):
         return response_util.pack_error_response(1008, "权限不足")
     
-    sku = request_util.get_str_param("sku")
-    if sku is not None:
-        sku = sku.strip()
-    if sku == "":
-        sku = None
-    
     status = request_util.get_str_param("status")
     if status is not None:
         status = status.strip()
@@ -298,10 +354,21 @@ def search_sale_order():
         offset = 0
     
     backend = request_context.get_backend()
-    total, records = backend.search_sale_order(sku, status, begin_date, end_date, offset, page_size)
+    total, records = backend.search_sale_order(status, begin_date, end_date, offset, page_size)
     
-    # 转换为字典
-    records_dict = [DtoUtil.to_dict(record) for record in records]
+    # 转换为字典，并解析sale_sku_list
+    records_dict = []
+    for record in records:
+        record_dict = DtoUtil.to_dict(record)
+        # 将JSON字符串解析为列表
+        if record_dict.get("sale_sku_list"):
+            try:
+                record_dict["sale_sku_list"] = json.loads(record_dict["sale_sku_list"])
+            except:
+                record_dict["sale_sku_list"] = []
+        else:
+            record_dict["sale_sku_list"] = []
+        records_dict.append(record_dict)
     
     return response_util.pack_pagination_result(total, records_dict)
 
