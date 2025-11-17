@@ -244,7 +244,7 @@ CREATE TABLE `t_sku_sale_price` (
   PRIMARY KEY (`Fproject_id`,`Fsku`),
   KEY `idx_create_time` (`Fcreate_time`),
   KEY `idx_modify_time` (`Fmodify_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='SKU销售价格表'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='SKU销售价格表';
 -- ========================================
 -- 11. 销售订单表
 -- ========================================

@@ -12,6 +12,10 @@ import typing
 import logging
 import requests
 from ec.verifycode.ydm_verify import YdmVerify
+from ec_erp_api.common.rate_limiter import RateLimiter
+
+
+GLOBAL_RATE_LIMITER = RateLimiter(max_count_per_period=1, seconds_per_period=1)
 
 
 class BigSellerClient:
@@ -1456,6 +1460,7 @@ class BigSellerClient:
 
     def post(self, url: str, data=None, json=None, timeout=None):
         import json as js
+        GLOBAL_RATE_LIMITER.acquire()
         if data is not None:
             req_text = js.dumps(data, ensure_ascii=False)[: 128]
         else:
