@@ -1476,6 +1476,7 @@ class BigSellerClient:
         return res
 
     def get(self, url: str, timeout=None):
+        GLOBAL_RATE_LIMITER.acquire(1000)
         self.logger.info(f"GET REQUEST {url}")
         if timeout is not None:
             res = self.session.get(url, timeout=timeout)
