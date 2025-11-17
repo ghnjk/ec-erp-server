@@ -1460,7 +1460,7 @@ class BigSellerClient:
 
     def post(self, url: str, data=None, json=None, timeout=None):
         import json as js
-        GLOBAL_RATE_LIMITER.acquire()
+        GLOBAL_RATE_LIMITER.acquire(1000)
         if data is not None:
             req_text = js.dumps(data, ensure_ascii=False)[: 128]
         else:
