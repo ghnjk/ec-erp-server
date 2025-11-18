@@ -15,7 +15,7 @@ from ec.verifycode.ydm_verify import YdmVerify
 from ec_erp_api.common.rate_limiter import RateLimiter
 
 
-GLOBAL_RATE_LIMITER = RateLimiter(max_count_per_period=2, seconds_per_period=10)
+GLOBAL_RATE_LIMITER = RateLimiter(max_count_per_period=1, seconds_per_period=0.5)
 
 
 class BigSellerClient:
@@ -1432,6 +1432,7 @@ class BigSellerClient:
               "stringpaymentVoucher": null
             }
         """
+        GLOBAL_RATE_LIMITER.acquire(1000)
         url = f"https://www.bigseller.com/api/v1/order/detail.json?id={order_id}&viewBuyerMessage=false"
         res = self.get(url).json()
         if res["code"] != 0:
@@ -1460,7 +1461,6 @@ class BigSellerClient:
 
     def post(self, url: str, data=None, json=None, timeout=None):
         import json as js
-        GLOBAL_RATE_LIMITER.acquire(1000)
         if data is not None:
             req_text = js.dumps(data, ensure_ascii=False)[: 128]
         else:
@@ -1476,7 +1476,6 @@ class BigSellerClient:
         return res
 
     def get(self, url: str, timeout=None):
-        GLOBAL_RATE_LIMITER.acquire(1000)
         self.logger.info(f"GET REQUEST {url}")
         if timeout is not None:
             res = self.session.get(url, timeout=timeout)
