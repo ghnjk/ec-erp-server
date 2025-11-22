@@ -68,7 +68,7 @@ def _query_all_new_orders(client, warehouse_id: int, begin_time_str: str, end_ti
     return all_orders
 
 
-def _mark_orders_to_wait_print(client, orders: list):
+def _mark_orders_to_wait_print(client: BigSellerClient, orders: list):
     """
     标记订单为待打印
     :param client: BigSeller 客户端

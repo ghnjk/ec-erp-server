@@ -886,7 +886,7 @@ class BigSellerClient:
           "flag": 0
       }
       res = self.post(url, data=req).json()
-      if res["code"] != 0 or not res["data"].get("success"):
+      if res["code"] != 0:
           print(f"set_new_order_to_wait_print failed.")
           print(json.dumps(res, indent=2))
           raise Exception(f"set_new_order_to_wait_print failed.")
