@@ -23,6 +23,49 @@ set_file_logger("../logs/preload_order.log", logger=logging.getLogger("preload_o
 logger = logging.getLogger("preload_order")
 
 
+def _query_wait_print_orders(client: BigSellerClient, warehouse_id: int):
+    """
+    查询所有待打印订单
+    :param client: BigSeller 客户端
+    :param warehouse_id: 仓库ID
+    :return: 订单列表
+    """
+    logger.info("[_query_wait_print_orders] 开始分页查询所有待打印订单")
+
+    all_orders = []
+    current_page = 1
+    page_size = 300
+    has_more = True
+    total_orders = 0
+
+    while has_more:
+        try:
+            logger.info(f"[_query_wait_print_orders] 查询第 {current_page} 页订单")
+            total_orders, orders = client.search_wait_print_order_by_warehouse_id(
+                warehouse_id, current_page, page_size
+            )
+
+            logger.info(
+                f"[_query_wait_print_orders] 第 {current_page} 页查询成功，获得 {len(orders)} 个订单，"
+                f"总计 {total_orders} 个"
+            )
+
+            all_orders.extend(orders)
+
+            # 检查是否有下一页
+            if len(orders) < page_size or len(all_orders) >= total_orders:
+                has_more = False
+            else:
+                current_page += 1
+
+        except Exception as e:
+            logger.error(f"[_query_wait_print_orders] 查询第 {current_page} 页失败: {str(e)}")
+            has_more = False
+
+    logger.info(f"[_query_wait_print_orders] 查询完成，共获得 {len(all_orders)} 个订单")
+    return all_orders
+
+
 def _query_all_new_orders(client, warehouse_id: int, begin_time_str: str, end_time_str: str):
     """
     查询所有新订单
@@ -178,6 +221,62 @@ def _write_order_to_cache(order_id: int, order_detail: dict) -> bool:
         return False
 
 
+def _cache_order_details_if_not_exist(client: BigSellerClient, order_ids: list):
+    """
+    如果订单详情缓存文件不存在，则获取订单详情并缓存到本地文件
+    :param client: BigSeller 客户端
+    :param order_ids: 订单ID列表
+    :return: 新缓存的订单数
+    """
+    logger.info(f"[_cache_order_details_if_not_exist] 开始检查并缓存 {len(order_ids)} 个订单的详情")
+
+    cached_success = 0
+    already_cached = 0
+
+    config = get_app_config()
+    cookies_dir = config.get("cookies_dir", "../cookies")
+    cache_dir = os.path.join(cookies_dir, "order_cache")
+
+    for idx, order_id in enumerate(order_ids, 1):
+        cache_file = os.path.join(cache_dir, f"{order_id}.json")
+
+        # 检查缓存文件是否存在
+        if os.path.exists(cache_file):
+            already_cached += 1
+            logger.info(f"[_cache_order_details_if_not_exist] 订单 {order_id} 缓存已存在，跳过 [{idx}/{len(order_ids)}]")
+            continue
+
+        try:
+            # 缓存不存在，获取订单详情
+            detail = client.get_order_detail(order_id)
+            logger.info(f"[_cache_order_details_if_not_exist] 订单 {order_id} 详情已获取 [{idx}/{len(order_ids)}]")
+
+            # 验证订单项
+            if not _validate_order_items(detail):
+                logger.warning(
+                    f"[_cache_order_details_if_not_exist] 订单 {order_id} 项验证不通过，不缓存 [{idx}/{len(order_ids)}]"
+                )
+                continue
+
+            # 写入缓存文件
+            if _write_order_to_cache(order_id, detail):
+                cached_success += 1
+                logger.info(f"[_cache_order_details_if_not_exist] 订单 {order_id} 详情已缓存 [{idx}/{len(order_ids)}]")
+            else:
+                logger.error(f"[_cache_order_details_if_not_exist] 订单 {order_id} 缓存写入失败 [{idx}/{len(order_ids)}]")
+
+        except Exception as e:
+            logger.error(
+                f"[_cache_order_details_if_not_exist] 获取订单 {order_id} 详情失败: {str(e)} [{idx}/{len(order_ids)}]"
+            )
+
+    logger.info(
+        f"[_cache_order_details_if_not_exist] 缓存完成，新缓存: {cached_success}, "
+        f"已存在缓存: {already_cached}, 失败: {len(order_ids) - cached_success - already_cached}"
+    )
+    return cached_success
+
+
 def _cache_order_details(client: BigSellerClient, order_ids: list):
     """
     缓存订单详情
@@ -259,7 +358,9 @@ def auto_preload_order():
     1、分页调用search_new_order查询最近24小时的订单，每页大小300
     2、逐个订单调用set_new_order_to_wait_print标记为待打印，每个单执行一次后等待1秒。需要兼容标记失败的情况，并重试1次。
     3、对标记成功的订单，调用get_order_detail获取订单详情，并缓存到本地文件。
-    4、输出预加载概要信息报告
+    4、分页调用search_wait_print_order_by_warehouse_id查询待打印订单，每页大小300
+    5、针对4查询到的订单，判断订单详情缓存文件是否存在，不存在则调用get_order_detail获取订单详情，并缓存到本地文件。
+    6、输出预加载概要信息报告
     """
 
     try:
@@ -303,10 +404,25 @@ def auto_preload_order():
         total_cached = _cache_order_details(client, successful_order_ids)
         logger.info(f"[auto_preload_order] 步骤3完成：缓存成功 {total_cached} 个订单详情")
 
-        # 步骤4：生成报告
+        # 步骤4：查询所有待打印订单
+        wait_print_orders = _query_wait_print_orders(client, warehouse_id)
+        total_wait_print = len(wait_print_orders)
+        logger.info(f"[auto_preload_order] 步骤4完成：查询到 {total_wait_print} 个待打印订单")
+
+        if total_wait_print == 0:
+            logger.info("[auto_preload_order] 没有待打印订单，步骤5跳过")
+            new_cached = 0
+        else:
+            # 步骤5：检查并缓存待打印订单详情（如果缓存不存在）
+            wait_print_order_ids = [order.get("id") for order in wait_print_orders if order.get("id")]
+            new_cached = _cache_order_details_if_not_exist(client, wait_print_order_ids)
+            logger.info(f"[auto_preload_order] 步骤5完成：新缓存 {new_cached} 个订单详情")
+
+        # 步骤6：生成报告
         total_failed = len(failed_order_ids)
+        total_all_cached = total_cached + new_cached
         report = _generate_report(begin_time_str, end_time_str, warehouse_id, 
-                                 total_queried, total_marked, total_cached, total_failed)
+                                 total_queried, total_marked, total_all_cached, total_failed)
         logger.info(report)
         print(report)
 

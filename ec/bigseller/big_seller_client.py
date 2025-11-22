@@ -893,6 +893,53 @@ class BigSellerClient:
       self.save_cookies()
       return res["data"]
 
+    def search_wait_print_order_by_warehouse_id(self, warehouse_id: int, current_page: int=1, page_size: int=300):
+        """
+        查询指定仓库的待打印订单信息
+        :param warehouse_id: 仓库id
+        :param current_page: 当前页码
+        :param page_size: 每页大小
+        :return: total, order_list
+        """
+        url = "https://www.bigseller.com/api/v1/order/new/pageList.json"
+        req = {
+            "warehouseIds": [int(warehouse_id)],
+            "hasLable": "",
+            "timeType": 1,
+            "days": "",
+            "beginDate": "",
+            "endDate": "",
+            "searchType": "orderNo",
+            "searchContent": "",
+            "inquireType": 2,
+            "showLogisticsArr": 0,
+            "showStoreArr": 0,
+            "blacklist": "",
+            "hasBlacklistCloud": "",
+            "cancelLabelProcess": "",
+            "cancelTimeTimeout": "",
+            "payType": "",
+            "shippedType": "",
+            "cancelReasonJson": {},
+            "status": "processing",
+            "allOrder": False,
+            "historyOrder": 0,
+            "packState": "3",
+            "desc": 1,
+            "orderBy": "skus",
+            "pageNo": current_page,
+            "pageSize": page_size
+        }
+        res = self.post(url, json=req).json()
+        if res["code"] != 0:
+            print(f"search_wait_print_order_by_warehouse_id failed for warehouse_id: {warehouse_id}")
+            print(json.dumps(res, indent=2))
+            raise Exception(f"search_wait_print_order_by_warehouse_id failed for warehouse_id: {warehouse_id}")
+        page = res["data"]["page"]
+        total = page["totalSize"]
+        rows = page["rows"]
+        return total, rows
+
     def search_wait_print_order(self, shipping_provider_id, current_page, page_size):
         """
         查询指定物流方式的待打印订单信息
