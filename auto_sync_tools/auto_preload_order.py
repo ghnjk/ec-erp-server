@@ -77,7 +77,7 @@ def _filter_orders_by_market_place_state(orders: list, exclude_state: str = "To 
     excluded_count = 0
     
     for order in orders:
-        market_place_state = order.get("markPlaceState")
+        market_place_state = order.get("marketPlaceState")
         order_id = order.get("id")
         
         if market_place_state == exclude_state:
