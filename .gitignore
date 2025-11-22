@@ -168,3 +168,4 @@ cython_debug/
 application.json
 big_seller.cookies
 conf/release_conf
+.ftp

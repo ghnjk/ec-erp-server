@@ -1,0 +1,366 @@
+# EC-ERP-Server 项目规则
+
+## 项目概述
+这是一个电商ERP后台服务系统，用于管理供应商、仓库、SKU、订单等电商业务流程。
+支持多国家/地区部署（印度、马来西亚、菲律宾、泰国）。
+
+## 技术栈
+- **后端框架**: Flask
+- **数据库**: MySQL + SQLAlchemy ORM
+- **搜索引擎**: Elasticsearch 7.14.2
+- **Python版本**: Python 3
+- **主要依赖**:
+  - Flask (Web框架)
+  - SQLAlchemy 1.4.51 (ORM)
+  - PyMySQL (MySQL驱动)
+  - Elasticsearch 7.14.2
+  - Requests (HTTP客户端)
+  - Pandas (数据处理)
+  - PyPDF2, ReportLab (PDF生成)
+
+## 项目结构
+
+### 核心模块
+- `ec_erp_app.py`: 应用主入口文件
+- `ec_erp_api/`: 主要API接口模块
+  - `apis/`: API路由定义（system系统、supplier供应商、warehouse仓库）
+  - `models/mysql_backend.py`: 数据库模型和DTO定义
+  - `common/`: 公共工具类
+    - `api_core.py`: API装饰器和日志处理
+    - `request_util.py`: 请求参数处理
+    - `response_util.py`: 响应格式化
+    - `codec_util.py`: 编解码工具
+  - `business/`: 业务逻辑层
+    - `order_printing.py`: 订单打印逻辑
+
+### 电商集成模块
+- `ec/`: 电商平台相关功能
+  - `bigseller/big_seller_client.py`: BigSeller平台API客户端
+  - `shop_manager.py`: 店铺管理
+  - `sku_manager.py`: SKU管理
+  - `sku_group_matcher.py`: SKU分组匹配
+  - `verifycode/`: 验证码识别处理
+
+### 自动化工具
+- `auto_sync_tools/`: 自动同步工具（用于定时任务）
+  - `sync_all_sku.py`: SKU同步
+  - `sync_order_to_es.py`: 订单同步到ES
+  - `sync_shop_statics_to_es.py`: 店铺统计同步
+  - `sync_sku_inventory.py`: SKU库存同步
+  - `auto_return_refund_order_to_warehouse.py`: 退单自动入库
+
+### 工具脚本
+- `tools/`: 辅助工具
+  - `init_db.py`: 数据库初始化
+  - `add_user.py`: 添加用户
+  - `import_sku.py`: 导入SKU
+  - `import_supplier_info.py`: 导入供应商信息
+  - `import_picking_note.py`: 导入拣货单
+
+### 配置和静态资源
+- `conf/`: 配置文件目录
+  - `application.json`: 应用配置（不在版本控制中）
+  - `application_template.json`: 配置模板
+  - `release_conf/`: 各国家配置
+- `static/`: 前端静态资源
+- `data/pdf/`: PDF文件存储
+
+### 文档目录
+- `docs/`: 项目文档
+  - `erp_api/`: API接口文档（Markdown格式）
+    - `README.md`: API文档总览和使用指南
+    - `system/`: 系统管理模块接口文档
+    - `supplier/`: 供应商管理模块接口文档
+    - `warehouse/`: 仓库管理模块接口文档
+    - `sales/`: 销售管理模块接口文档
+  - `sample_response/`: API响应示例数据
+  - `ec_erp_db.sql`: 数据库建表语句
+  - `bigseller接口.md`: BigSeller第三方接口文档
+
+## 编码规范
+
+### Python代码风格
+1. **文件头格式**:
+```python
+#!/usr/bin/env python3
+# -*- coding:utf-8 _*-
+"""
+@file: filename
+@author: jkguo
+@create: YYYY/MM/DD
+"""
+```
+
+2. **编码**:
+   - 统一使用 UTF-8 编码
+   - 文件第二行必须声明编码: `# -*- coding:utf-8 _*-`
+
+3. **导入顺序**:
+   - 标准库导入
+   - 第三方库导入
+   - 本地模块导入
+   - 每组之间空一行
+
+4. **命名规范**:
+   - 类名: PascalCase (如 `BigSellerClient`, `MysqlBackend`)
+   - 函数/方法: snake_case (如 `get_app_config`, `login_user`)
+   - 常量: UPPER_SNAKE_CASE (如 `CONFIG_DIR`, `__APP_CONFIG__`)
+   - 私有方法: 前缀单下划线 (如 `_get_login_user_info`)
+   - 数据库表名: `t_` 前缀 + snake_case (如 `t_user_info`, `t_sku_info`)
+   - 数据库字段名: `F` 前缀 + snake_case (如 `Fproject_id`, `Fuser_name`)
+
+### API开发规范
+1. **Blueprint注册**:
+   - 使用Flask Blueprint组织API路由
+   - URL前缀格式: `/erp_api/{module_name}`
+   - 示例: `/erp_api/system`, `/erp_api/supplier`, `/erp_api/warehouse`
+
+2. **API装饰器**:
+   - 所有API接口必须使用 `@api_post_request()` 装饰器
+   - 统一处理请求日志、异常捕获、响应格式化
+
+3. **请求处理**:
+   - 使用 `request_util.get_*_param()` 获取请求参数
+   - 使用 `response_util.pack_*_response()` 返回响应
+
+4. **响应格式**:
+```python
+{
+    "result": "0",  # 0表示成功，其他表示错误码
+    "resultMsg": "成功",  # 错误信息
+    "traceId": "TRACE_xxx",  # 追踪ID
+    "data": {}  # 响应数据
+}
+```
+
+5. **错误码规范**:
+   - 1001: 系统异常
+   - 1002: 用户认证失败
+   - 1003: 参数错误
+   - 使用 `response_util.pack_error_json_response(code, msg)` 返回错误
+
+### 数据库规范
+1. **ORM使用**:
+   - 使用SQLAlchemy定义模型
+   - 继承 `DtoBase` 基类
+   - 使用 `DtoUtil` 进行DTO与字典的转换
+
+2. **命名约定**:
+   - 表名: `t_` 前缀 + 功能描述
+   - 字段名: `F` 前缀 + 字段描述
+   - DTO类名: `Dto` 前缀 + 业务名称
+
+3. **多项目支持**:
+   - 核心表必须包含 `Fproject_id` 字段用于区分国家/地区
+   - 查询时需要加上项目ID过滤条件
+
+### 日志规范
+1. **日志分类**:
+   - `ACC`: API访问日志 (logs/acc.log)
+   - `ASYNC_TASK`: 异步任务日志 (logs/async_task.log)
+   - `INVOKER`: 调用第三方接口日志 (logs/invoker.log)
+   - `sqlalchemy.engine`: SQL执行日志 (logs/sql.log)
+
+2. **日志格式**:
+   - 使用 `set_file_logger()` 配置日志
+   - 请求日志包含: trace_id, path, body
+   - 响应日志包含: trace_id, path, cost_time, body
+
+3. **日志级别**:
+   - `logger.info()`: 正常流程
+   - `logger.error()`: 异常错误
+   - `logger.debug()`: 调试信息
+
+### 配置管理
+1. **配置文件**:
+   - `application.json` 不纳入版本控制
+   - 使用 `application_template.json` 作为模板
+   - 不同环境使用 `release_conf/application_{country}.json`
+
+2. **配置访问**:
+   - 使用 `get_app_config()` 获取配置
+   - 使用 `get_config_file(filename)` 获取配置文件路径
+
+### Session管理
+1. **用户认证**:
+   - 登录后在session中保存 `user_name` 和 `project_id`
+   - 使用 `request_context.get_current_user()` 获取当前用户
+   - 使用 `request_context.get_current_project_id()` 获取当前项目
+
+2. **密码处理**:
+   - 使用 `codec_util.calc_sha256()` 进行密码加密
+   - 不在日志中记录明文密码
+
+## 开发工作流
+
+### 添加新API接口
+1. 在对应的 `apis/*.py` 文件中添加路由
+2. 使用 `@api_post_request()` 装饰器
+3. 通过 `request_util` 获取参数
+4. 通过 `request_context.get_backend()` 访问数据库
+5. 使用 `response_util` 返回响应
+6. 在 `docs/erp_api/{module}/` 目录下创建接口文档（Markdown格式）
+7. 更新 `docs/erp_api/README.md` 的接口列表
+
+### 添加新数据表
+1. 在 `models/mysql_backend.py` 中定义DTO类
+2. 表名使用 `t_` 前缀
+3. 字段名使用 `F` 前缀
+4. 必要字段: `Fproject_id`, `Fcreate_time`, `Fmodify_time`
+5. 定义 `columns` 列表，包含所有字段名
+6. 在Backend类中添加相应的CRUD方法
+7. 更新 `docs/ec_erp_db.sql` 文件，添加建表语句
+
+### 集成第三方服务
+1. 在 `ec/` 目录下创建对应的客户端类
+2. 使用 `INVOKER` logger记录调用日志
+3. 实现登录态管理和cookie持久化
+4. 添加异常处理和重试机制
+
+### 添加自动化任务
+1. 在 `auto_sync_tools/` 目录创建脚本
+2. 配置crontab定时执行
+3. 日志重定向到文件 `2>&1 1>>std.log`
+4. 处理异常，确保任务稳定性
+
+## 部署和运维
+
+### 数据库部署
+- 每个国家创建独立数据库
+- 命名格式: `ec_erp_db_{country}`
+- 用户命名: `ec_erp_{country}`
+
+### 应用启动
+```bash
+python ec_erp_app.py
+# 或使用
+./restart.sh
+```
+
+### 定时任务
+- 日志清理: 每天5:20删除10天前的打印文件
+- 库存同步: 每天8:30同步SKU库存
+
+### 日志管理
+- 使用RotatingFileHandler
+- 单文件最大100MB
+- 最多保留20个备份文件
+
+## 安全规范
+1. **密码**: 使用SHA256加密存储
+2. **Session**: 配置secret_key，不泄露到代码仓库
+3. **配置文件**: application.json不纳入版本控制
+4. **第三方凭证**: 存储在配置文件中，不硬编码
+
+## 测试规范
+- 工具脚本放在 `tools/test.py`
+- 避免在生产环境执行测试代码
+- 测试数据库与生产数据库分离
+
+## 前端集成
+- 前端静态资源在 `static/` 目录
+- API接口统一前缀 `/erp_api/`
+- 支持通过token登录: `/erp_api/system/login_user_with_token`
+
+## 注意事项
+1. 所有涉及金额的计算使用浮点数小心处理精度
+2. 日期时间统一使用 `datetime` 对象，格式化为 `YYYY-MM-DD HH:MM:SS`
+3. 与BigSeller集成需要处理验证码识别
+4. PDF生成使用中文字体: WeChatSansStd-Regular.ttf
+5. ES索引同步需要考虑数据量和性能
+6. 多项目支持时注意数据隔离
+
+## 文档规范
+
+### API接口文档
+每个API接口必须创建独立的Markdown文档，包含以下内容：
+
+1. **接口信息**: 路径、方法、描述、权限要求
+2. **请求参数**: 参数名、类型、必填、说明
+3. **响应参数**: 完整的响应结构说明
+4. **错误码**: 可能的错误码和说明
+5. **请求示例**: 实际的JSON请求示例
+6. **响应示例**: 成功和失败的响应示例（基于sample_response）
+7. **业务逻辑说明**: 详细的处理逻辑
+8. **注意事项**: 重要提醒和使用说明
+
+文档模板：
+```markdown
+# 接口名称
+
+## 接口信息
+- **接口路径**: `/erp_api/{module}/{api_name}`
+- **请求方法**: POST
+- **接口描述**: 接口功能说明
+- **权限要求**: 需要的权限
+
+## 请求参数
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+
+## 响应参数
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+
+## 错误码
+## 请求示例
+## 响应示例
+## 业务逻辑说明
+## 注意事项
+```
+
+### 数据库文档
+- 建表语句统一维护在 `docs/ec_erp_db.sql`
+- 每个表必须有完整的字段注释
+- 必须定义合适的索引
+- 所有表使用 utf8 字符集
+- 金额字段使用 INT 类型（单位：分）
+
+## 常用命令
+
+### 数据库相关
+```bash
+# 初始化数据库
+python tools/init_db.py
+
+# 或使用SQL脚本
+mysql -u username -p < docs/ec_erp_db.sql
+
+# 添加用户
+python tools/add_user.py {project_id} {username} {password}
+
+# 导入SKU
+python tools/import_sku.py
+```
+
+### 同步任务
+```bash
+# 同步库存
+python auto_sync_tools/sync_sku_inventory.py
+
+# 同步订单到ES
+python auto_sync_tools/sync_order_to_es.py
+
+# 同步店铺统计
+python auto_sync_tools/sync_shop_statics_to_es.py
+```
+
+### 查看文档
+```bash
+# 查看API文档
+cat docs/erp_api/README.md
+
+# 查看具体接口文档
+cat docs/erp_api/supplier/search_sku.md
+```
+
+## Git规范
+- 不提交 `application.json` 配置文件
+- 不提交 `*.pyc` 和 `__pycache__` 文件
+- 不提交日志文件和临时数据文件
+- 不提交 `data/pdf/` 目录下的PDF文件
+- 不提交 `cookies/` 目录下的cookie文件
+- 提交代码时同步更新相关文档
+
+# CURSOR执行注意事项
+* 如果没有显示要求，每次执行任务不需要生成类似总结，changelog等markdown文档。

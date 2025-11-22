@@ -774,6 +774,125 @@ class BigSellerClient:
             raise Exception(f"get_order_status_count failed.")
         return res["data"]["shipProviderList"]
 
+    def search_new_order(self, warehouse_id: int, begin_time: str, end_time: str, current_page: int=1, page_size: int=300):
+      """
+      查询指定仓库的新订单信息
+      :param warehouse_id: 仓库id
+      :param begin_time: 开始时间 yyyy-mm-dd hh:mm:ss
+      :param end_time: 结束时间 yyyy-mm-dd hh:mm:ss
+      :param current_page: 当前页码
+      :param page_size: 每页大小
+      :return: total, order_list(参考search_wait_print_order的返回格式)
+      """
+      url = "https://www.bigseller.com/api/v1/order/new/pageList.json"
+      req = {
+        "scanPictures": None,
+        "sampleOrder": None,
+        "skuSize": None,
+        "skuType": None,
+        "shipConfigType": None,
+        "invoiceMark": None,
+        "dropshipper": None,
+        "promotionType": None,
+        "platformOrderType": None,
+        "storePickUp": None,
+        "priorityProcess": None,
+        "shopId": None,
+        "status": "new",
+        "platformStatus": None,
+        "shipProviderId": None,
+        "printStatus": 3,
+        "paymentMethod": None,
+        "paymentType": None,
+        "hasRemark": None,
+        "hasDeducted": None,
+        "isWarehouseBack": None,
+        "hasLable": "",
+        "lableIds": None,
+        "timeType": 1,
+        "days": None,
+        "beginDate": begin_time,
+        "endDate": end_time,
+        "searchType": "orderNo",
+        "pageWarehouseIds": None,
+        "searchContent": "",
+        "inquireType": 2,
+        "priorityValue": None,
+        "failType": None,
+        "printLabelMark": None,
+        "printPickListMark": 0,
+        "printCollectMark": None,
+        "printSign": None,
+        "currentShopPlatform": None,
+        "isPreOrder": None,
+        "selectedShipList": None,
+        "priorityDelivery": None,
+        "estimatedProfit": None,
+        "showLogisticsArr": 0,
+        "showStoreArr": 0,
+        "shopGroup": None,
+        "blacklist": "",
+        "hasBlacklistCloud": "",
+        "inCancelBeforeStatus": None,
+        "cancelLabelProcess": "",
+        "cancelTimeTimeout": "",
+        "payType": "",
+        "shippedType": "",
+        "cancelReasonJsonStr": None,
+        "returnType": None,
+        "preShip": None,
+        "printRange": [],
+        "crossBorder": "",
+        "logisticsServices": None,
+        "replaceGoodsFlag": "",
+        "quickOrder": None,
+        "hasRemarkList": [],
+        "printShipLabelMark": None,
+        "customerLevelIdList": [],
+        "printBillMark": None,
+        "packageTypes": None,
+        "tiktokPackageType": None,
+        "firstShipped": None,
+        "allOrder": False,
+        "historyOrder": False,
+        "packState": "0",
+        "desc": 1,
+        "orderBy": "printTime",
+        "wareType": None,
+        "warehouseIdList": [str(warehouse_id)],
+        "waveSearchType": None,
+        "pageNo": current_page,
+        "pageSize": page_size
+      }
+      res = self.post(url, json=req).json()
+      if res["code"] != 0:
+          print(f"search_new_order failed.")
+          print(json.dumps(res, indent=2))
+          raise Exception(f"search_new_order failed.")
+      page = res["data"]["page"]
+      total = page["totalSize"]
+      rows = page["rows"]
+      return total, rows
+
+    def set_new_order_to_wait_print(self, order_id: int):
+      """
+      将新订单标记为待打印
+      :param order_id: 订单id
+      :return:
+      """
+      url = "https://www.bigseller.com/api/v1/order/pack.json"
+      req = {
+          "orderId": str(order_id),
+          "flag": 0
+      }
+      res = self.post(url, data=req).json()
+      if res["code"] != 0 or not res["data"].get("success"):
+          print(f"set_new_order_to_wait_print failed.")
+          print(json.dumps(res, indent=2))
+          raise Exception(f"set_new_order_to_wait_print failed.")
+      self.save_cookies()
+      return res["data"]
+
     def search_wait_print_order(self, shipping_provider_id, current_page, page_size):
         """
         查询指定物流方式的待打印订单信息
