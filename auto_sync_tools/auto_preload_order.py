@@ -66,6 +66,35 @@ def _query_wait_print_orders(client: BigSellerClient, warehouse_id: int):
     return all_orders
 
 
+def _filter_orders_by_market_place_state(orders: list, exclude_state: str = "To Process(New)"):
+    """
+    过滤掉指定marketPlaceState的订单
+    :param orders: 订单列表
+    :param exclude_state: 需要过滤掉的marketPlaceState值
+    :return: (过滤后的订单列表, 过滤掉的订单数)
+    """
+    filtered_orders = []
+    excluded_count = 0
+    
+    for order in orders:
+        market_place_state = order.get("markPlaceState")
+        order_id = order.get("id")
+        
+        if market_place_state == exclude_state:
+            excluded_count += 1
+            logger.info(
+                f"[_filter_orders_by_market_place_state] 订单 {order_id} 状态为 '{exclude_state}'，已忽略"
+            )
+        else:
+            filtered_orders.append(order)
+    
+    logger.info(
+        f"[_filter_orders_by_market_place_state] 过滤完成：过滤前 {len(orders)} 个订单，"
+        f"过滤后 {len(filtered_orders)} 个订单，过滤掉 {excluded_count} 个 '{exclude_state}' 订单"
+    )
+    return filtered_orders, excluded_count
+
+
 def _query_all_new_orders(client, warehouse_id: int, begin_time_str: str, end_time_str: str):
     """
     查询所有新订单
@@ -356,6 +385,7 @@ def auto_preload_order():
     自动预加载订单
     执行逻辑：
     1、分页调用search_new_order查询最近24小时的订单，每页大小300
+    1.5、过滤掉marketPlaceState="To Process(New)"的订单，这些订单还不能处理
     2、逐个订单调用set_new_order_to_wait_print标记为待打印，每个单执行一次后等待1秒。需要兼容标记失败的情况，并重试1次。
     3、对标记成功的订单，调用get_order_detail获取订单详情，并缓存到本地文件。
     4、分页调用search_wait_print_order_by_warehouse_id查询待打印订单，每页大小300
@@ -396,12 +426,24 @@ def auto_preload_order():
             print(report)
             return
 
+        # 步骤1.5：过滤掉marketPlaceState="To Process(New)"的订单
+        all_orders, excluded_count = _filter_orders_by_market_place_state(all_orders)
+        total_queried = len(all_orders)
+        logger.info(f"[auto_preload_order] 步骤1.5完成：过滤后剩余 {total_queried} 个订单，已过滤 {excluded_count} 个 'To Process(New)' 订单")
+
+        if total_queried == 0:
+            logger.info("[auto_preload_order] 过滤后没有可处理的订单，任务完成")
+            report = _generate_report(begin_time_str, end_time_str, warehouse_id, total_queried + excluded_count, 0, 0, 0)
+            logger.info(report)
+            print(report)
+            return
+
         # 步骤2：标记订单为待打印
         total_marked, successful_order_ids, failed_order_ids = _mark_orders_to_wait_print(client, all_orders)
         logger.info(f"[auto_preload_order] 步骤2完成：标记成功 {total_marked} 个订单")
 
         # 步骤3：缓存标记成功的订单详情
-        total_cached = _cache_order_details(client, successful_order_ids)
+        total_cached = _cache_order_details_if_not_exist(client, successful_order_ids)
         logger.info(f"[auto_preload_order] 步骤3完成：缓存成功 {total_cached} 个订单详情")
 
         # 步骤4：查询所有待打印订单
