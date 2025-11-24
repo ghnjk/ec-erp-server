@@ -350,6 +350,32 @@ def _cache_order_details(client: BigSellerClient, order_ids: list):
     return cached_success
 
 
+def _process_wait_print_orders(client: BigSellerClient, warehouse_id: int):
+    """
+    处理待打印订单（步骤4和步骤5）
+    执行逻辑：
+    4、分页调用search_wait_print_order_by_warehouse_id查询待打印订单，每页大小300
+    5、针对4查询到的订单，判断订单详情缓存文件是否存在，不存在则调用get_order_detail获取订单详情，并缓存到本地文件。
+    :param client: BigSeller 客户端
+    :param warehouse_id: 仓库ID
+    :return: (待打印订单总数, 新缓存订单数)
+    """
+    # 步骤4：查询所有待打印订单
+    wait_print_orders = _query_wait_print_orders(client, warehouse_id)
+    total_wait_print = len(wait_print_orders)
+    logger.info(f"[_process_wait_print_orders] 步骤4完成：查询到 {total_wait_print} 个待打印订单")
+
+    if total_wait_print == 0:
+        logger.info("[_process_wait_print_orders] 没有待打印订单，步骤5跳过")
+        return total_wait_print, 0
+    else:
+        # 步骤5：检查并缓存待打印订单详情（如果缓存不存在）
+        wait_print_order_ids = [order.get("id") for order in wait_print_orders if order.get("id")]
+        new_cached = _cache_order_details_if_not_exist(client, wait_print_order_ids)
+        logger.info(f"[_process_wait_print_orders] 步骤5完成：新缓存 {new_cached} 个订单详情")
+        return total_wait_print, new_cached
+
+
 def _generate_report(begin_time_str: str, end_time_str: str, warehouse_id: int, 
                      total_queried: int, total_marked: int, total_cached: int, total_failed: int):
     """
@@ -380,21 +406,19 @@ def _generate_report(begin_time_str: str, end_time_str: str, warehouse_id: int,
     return report
 
 
-def auto_preload_order():
+def auto_preload_new_order():
     """
-    自动预加载订单
+    预加载新订单（步骤1-3）
     执行逻辑：
     1、分页调用search_new_order查询最近24小时的订单，每页大小300
     1.5、过滤掉marketPlaceState="To Process(New)"的订单，这些订单还不能处理
     2、逐个订单调用set_new_order_to_wait_print标记为待打印，每个单执行一次后等待1秒。需要兼容标记失败的情况，并重试1次。
     3、对标记成功的订单，调用get_order_detail获取订单详情，并缓存到本地文件。
-    4、分页调用search_wait_print_order_by_warehouse_id查询待打印订单，每页大小300
-    5、针对4查询到的订单，判断订单详情缓存文件是否存在，不存在则调用get_order_detail获取订单详情，并缓存到本地文件。
-    6、输出预加载概要信息报告
+    最后生成新订单处理报告
     """
 
     try:
-        logger.info("[auto_preload_order] ========== 开始自动预加载订单任务 ==========")
+        logger.info("[auto_preload_new_order] ========== 开始处理新订单 ==========")
 
         # 获取配置
         config = get_app_config()
@@ -406,73 +430,128 @@ def auto_preload_order():
         begin_time_str = begin_time.strftime("%Y-%m-%d %H:%M:%S")
         end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
 
-        logger.info(f"[auto_preload_order] 查询时间范围: {begin_time_str} ~ {end_time_str}")
-        logger.info(f"[auto_preload_order] 仓库ID: {warehouse_id}")
+        logger.info(f"[auto_preload_new_order] 查询时间范围: {begin_time_str} ~ {end_time_str}")
+        logger.info(f"[auto_preload_new_order] 仓库ID: {warehouse_id}")
 
         # 获取 BigSeller 客户端
         client = build_big_seller_client()
         client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
-        logger.info("[auto_preload_order] BigSeller 客户端初始化成功")
+        logger.info("[auto_preload_new_order] BigSeller 客户端初始化成功")
 
         # 步骤1：查询所有新订单
         all_orders = _query_all_new_orders(client, warehouse_id, begin_time_str, end_time_str)
         total_queried = len(all_orders)
-        logger.info(f"[auto_preload_order] 步骤1完成：查询到 {total_queried} 个订单")
+        logger.info(f"[auto_preload_new_order] 步骤1完成：查询到 {total_queried} 个订单")
 
         if total_queried == 0:
-            logger.info("[auto_preload_order] 没有查询到订单，任务完成")
+            logger.info("[auto_preload_new_order] 没有查询到新订单")
             report = _generate_report(begin_time_str, end_time_str, warehouse_id, 0, 0, 0, 0)
             logger.info(report)
             print(report)
+            logger.info("[auto_preload_new_order] ========== 处理新订单完成 ==========\n")
             return
 
         # 步骤1.5：过滤掉marketPlaceState="To Process(New)"的订单
         all_orders, excluded_count = _filter_orders_by_market_place_state(all_orders)
         total_queried = len(all_orders)
-        logger.info(f"[auto_preload_order] 步骤1.5完成：过滤后剩余 {total_queried} 个订单，已过滤 {excluded_count} 个 'To Process(New)' 订单")
+        logger.info(f"[auto_preload_new_order] 步骤1.5完成：过滤后剩余 {total_queried} 个订单，已过滤 {excluded_count} 个 'To Process(New)' 订单")
 
         if total_queried == 0:
-            logger.info("[auto_preload_order] 过滤后没有可处理的订单，任务完成")
+            logger.info("[auto_preload_new_order] 过滤后没有可处理的订单")
             report = _generate_report(begin_time_str, end_time_str, warehouse_id, total_queried + excluded_count, 0, 0, 0)
             logger.info(report)
             print(report)
+            logger.info("[auto_preload_new_order] ========== 处理新订单完成 ==========\n")
             return
 
         # 步骤2：标记订单为待打印
         total_marked, successful_order_ids, failed_order_ids = _mark_orders_to_wait_print(client, all_orders)
-        logger.info(f"[auto_preload_order] 步骤2完成：标记成功 {total_marked} 个订单")
+        logger.info(f"[auto_preload_new_order] 步骤2完成：标记成功 {total_marked} 个订单")
 
         # 步骤3：缓存标记成功的订单详情
         total_cached = _cache_order_details_if_not_exist(client, successful_order_ids)
-        logger.info(f"[auto_preload_order] 步骤3完成：缓存成功 {total_cached} 个订单详情")
+        logger.info(f"[auto_preload_new_order] 步骤3完成：缓存成功 {total_cached} 个订单详情")
 
-        # 步骤4：查询所有待打印订单
-        wait_print_orders = _query_wait_print_orders(client, warehouse_id)
-        total_wait_print = len(wait_print_orders)
-        logger.info(f"[auto_preload_order] 步骤4完成：查询到 {total_wait_print} 个待打印订单")
-
-        if total_wait_print == 0:
-            logger.info("[auto_preload_order] 没有待打印订单，步骤5跳过")
-            new_cached = 0
-        else:
-            # 步骤5：检查并缓存待打印订单详情（如果缓存不存在）
-            wait_print_order_ids = [order.get("id") for order in wait_print_orders if order.get("id")]
-            new_cached = _cache_order_details_if_not_exist(client, wait_print_order_ids)
-            logger.info(f"[auto_preload_order] 步骤5完成：新缓存 {new_cached} 个订单详情")
-
-        # 步骤6：生成报告
+        # 生成新订单报告
         total_failed = len(failed_order_ids)
-        total_all_cached = total_cached + new_cached
         report = _generate_report(begin_time_str, end_time_str, warehouse_id, 
-                                 total_queried, total_marked, total_all_cached, total_failed)
+                                 total_queried, total_marked, total_cached, total_failed)
         logger.info(report)
         print(report)
 
-        logger.info("[auto_preload_order] ========== 自动预加载订单任务完成 ==========\n")
+        logger.info("[auto_preload_new_order] ========== 处理新订单完成 ==========\n")
 
     except Exception as e:
-        logger.error(f"[auto_preload_order] 自动预加载订单失败: {str(e)}", exc_info=True)
+        logger.error(f"[auto_preload_new_order] 处理新订单失败: {str(e)}", exc_info=True)
         raise
+
+
+def auto_preload_wait_print_order():
+    """
+    预加载待打印订单（步骤4-5）
+    执行逻辑：
+    1、分页调用search_wait_print_order_by_warehouse_id查询待打印订单，每页大小300
+    2、针对查询到的订单，判断订单详情缓存文件是否存在，不存在则调用get_order_detail获取订单详情，并缓存到本地文件。
+    最后生成待打印订单处理报告
+    """
+
+    try:
+        logger.info("[auto_preload_wait_print_order] ========== 开始处理待打印订单 ==========")
+
+        # 获取配置
+        config = get_app_config()
+        warehouse_id = config.get("big_seller_warehouse_id")
+
+        # 计算时间范围（最近24小时）
+        end_time = datetime.now()
+        begin_time = end_time - timedelta(hours=24)
+        begin_time_str = begin_time.strftime("%Y-%m-%d %H:%M:%S")
+        end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
+
+        logger.info(f"[auto_preload_wait_print_order] 查询时间范围: {begin_time_str} ~ {end_time_str}")
+        logger.info(f"[auto_preload_wait_print_order] 仓库ID: {warehouse_id}")
+
+        # 获取 BigSeller 客户端
+        client = build_big_seller_client()
+        client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+        logger.info("[auto_preload_wait_print_order] BigSeller 客户端初始化成功")
+
+        # 步骤4&5：处理待打印订单
+        total_wait_print, new_cached = _process_wait_print_orders(client, warehouse_id)
+        logger.info(f"[auto_preload_wait_print_order] 步骤4&5完成：待打印订单 {total_wait_print} 个，新缓存 {new_cached} 个订单详情")
+
+        # 生成待打印订单报告（只显示本次处理的待打印订单统计）
+        report = (
+            f"\n"
+            f"========== auto_preload_wait_print_order 待打印订单处理报告 ==========\n"
+            f"开始时间: {begin_time_str}\n"
+            f"结束时间: {end_time_str}\n"
+            f"仓库ID: {warehouse_id}\n"
+            f"\n"
+            f"待打印订单处理统计:\n"
+            f"- 待打印订单总数: {total_wait_print}\n"
+            f"- 新缓存订单详情: {new_cached}\n"
+            f"====================================================\n"
+        )
+        logger.info(report)
+        print(report)
+
+        logger.info("[auto_preload_wait_print_order] ========== 处理待打印订单完成 ==========\n")
+
+    except Exception as e:
+        logger.error(f"[auto_preload_wait_print_order] 处理待打印订单失败: {str(e)}", exc_info=True)
+        raise
+
+
+def auto_preload_order():
+    try:
+        auto_preload_new_order()
+    except Exception as e:
+        logger.error(f"[auto_preload_order] 自动预加载订单失败: {str(e)}", exc_info=True)
+    try:
+        auto_preload_wait_print_order()
+    except Exception as e:
+        logger.error(f"[auto_preload_order] 自动预加载待打印订单失败: {str(e)}", exc_info=True)
 
 
 if __name__ == "__main__":
