@@ -45,6 +45,7 @@ class PrintOrderThread(threading.Thread):
         self.print_pdf_file_path = ""
         self.print_pdf_url = ""
         self.print_pdf_writer = None
+        self.download_pdf_batch_size = 250
         self.logger = logging.getLogger("ASYNC_TASK")
 
     def run(self):
@@ -71,12 +72,29 @@ class PrintOrderThread(threading.Thread):
             self._save_task()
 
     def _download_all_order_pdf(self):
+        self.print_pdf_writer = PdfWriter()
+        # 将order_list按250分组
+        batch_size = self.download_pdf_batch_size
+        order_list = self.task.order_list
+        total_orders = len(order_list)
+        
+        # 调用_group_order_list下载pdf，需要保证打印是否成功, 如果失败则返回失败
+        for i in range(0, total_orders, batch_size):
+            batch_orders = order_list[i:i + batch_size]
+            self.log(f"处理订单批次 {i // batch_size + 1}，包含 {len(batch_orders)} 个订单")
+            append_log_to_task(self.task, f"处理订单批次 {i // batch_size + 1}，包含 {len(batch_orders)} 个订单")
+            if not self._group_order_list(batch_orders):
+                return False
+        
+        return True
+
+    def _group_order_list(self, order_list: list):
         order_id_list = []
         platform_order_no_list = []
         picking_note_list = []
         # 解析所有订单信息
         platform = ""
-        for order in self.task.order_list:
+        for order in order_list:
             order_id = order["id"]
             order_id_list.append(str(order_id))
             platform_order_no = order["platformOrderId"]
@@ -249,8 +267,18 @@ class PrintOrderThread(threading.Thread):
         return note_list
 
     def _mark_all_order_printed(self):
+        batch_size = self.download_pdf_batch_size
+        order_list = self.task.order_list
+        total_orders = len(order_list)
+        for i in range(0, total_orders, batch_size):
+            batch_orders = order_list[i:i + batch_size]
+            self.log(f"处理订单批次 {i // batch_size + 1}，包含 {len(batch_orders)} 个订单")
+            self._mark_all_order_printed_batch(batch_orders)
+        return True
+    
+    def _mark_all_order_printed_batch(self, order_list: list):
         order_id_list = []
-        for order in self.task.order_list:
+        for order in order_list:
             order_id = order["id"]
             order_id_list.append(str(order_id))
         try:
@@ -316,7 +344,6 @@ class PrintOrderThread(threading.Thread):
         # split all pdfs
         reader = PdfReader(origin_all_pdf_file)
         split_writer = PdfWriter()
-        self.print_pdf_writer = PdfWriter()
         idx = 0
         for i in range(len(reader.pages)):
             page = reader.pages[i]
@@ -350,7 +377,7 @@ class PrintOrderThread(threading.Thread):
             # all merge page >>
             self.print_pdf_writer.add_page(page)
         split_writer.close()
-        self.print_pdf_writer.add_metadata(reader.metadata)
+        # self.print_pdf_writer.add_metadata(reader.metadata)
         if idx != len(platform_order_no_list) or len(self.pdf_list) != len(platform_order_no_list):
             self.log(f"print task {self.task.task_id} _split_and_note_pdf 异常， 拆分pdf数和订单数不匹配")
             append_log_to_task(self.task, "_split_and_note_pdf 异常， 拆分pdf数和订单数不匹配")
