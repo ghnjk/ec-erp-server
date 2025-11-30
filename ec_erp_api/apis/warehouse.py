@@ -45,7 +45,54 @@ def search_wait_print_order():
     current_page = request_util.get_int_param("current_page")
     page_size = request_util.get_int_param("page_size")
     client = big_seller_util.build_big_seller_client()
-    total, rows = client.search_wait_print_order(shipping_provider_id, current_page, page_size)
+    
+    # 底层client最多支持page_size=200，如果page_size > 200，需要分页查询
+    MAX_PAGE_SIZE = 200
+    if page_size <= MAX_PAGE_SIZE:
+        total, rows = client.search_wait_print_order(shipping_provider_id, current_page, page_size)
+    else:
+        # page_size > 200 的情况，需要分页查询
+        offset = (current_page - 1) * page_size
+        end_offset = offset + page_size
+        
+        # 计算起始查询页码，避免查询不需要的数据
+        start_client_page = offset // MAX_PAGE_SIZE + 1
+        start_offset_in_page = offset % MAX_PAGE_SIZE
+        
+        # 分页查询，每次查询MAX_PAGE_SIZE条数据
+        all_rows = []
+        total = 0
+        current_client_page = start_client_page
+        
+        # 持续查询直到收集到足够的数据或者没有更多数据
+        while len(all_rows) < page_size:
+            batch_total, batch_rows = client.search_wait_print_order(
+                shipping_provider_id, current_client_page, MAX_PAGE_SIZE
+            )
+            if current_client_page == start_client_page:
+                total = batch_total
+            
+            if not batch_rows:
+                break
+            
+            # 记录原始批次大小，用于判断是否是最后一页
+            original_batch_size = len(batch_rows)
+            
+            # 第一次查询需要跳过前面的offset
+            if current_client_page == start_client_page and start_offset_in_page > 0:
+                batch_rows = batch_rows[start_offset_in_page:]
+            
+            all_rows.extend(batch_rows)
+            
+            # 如果已经收集足够或者没有更多数据，停止查询
+            if len(all_rows) >= page_size or original_batch_size < MAX_PAGE_SIZE:
+                break
+            
+            current_client_page += 1
+        
+        # 截取准确的数量（最后一批可能超出）
+        rows = all_rows[:page_size]
+    
     return response_util.pack_json_response(
         {
             "total": total,
