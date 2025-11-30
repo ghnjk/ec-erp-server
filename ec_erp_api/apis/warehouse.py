@@ -92,7 +92,8 @@ def search_wait_print_order():
         
         # 截取准确的数量（最后一批可能超出）
         rows = all_rows[:page_size]
-    
+    for item in rows:
+        del item["orderItemList"]
     return response_util.pack_json_response(
         {
             "total": total,
