@@ -15,7 +15,7 @@ from ec.verifycode.ydm_verify import YdmVerify
 from ec_erp_api.common.rate_limiter import RateLimiter
 
 
-GLOBAL_RATE_LIMITER = RateLimiter(max_count_per_period=1, seconds_per_period=3)
+GLOBAL_RATE_LIMITER = RateLimiter(max_count_per_period=1, seconds_per_period=5)
 
 
 class BigSellerClient:

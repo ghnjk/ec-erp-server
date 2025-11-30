@@ -251,7 +251,19 @@ class OrderAnalysis(object):
             with open(cache_file, "r") as f:
                 detail = json.load(f)
         else:
-            detail = self.client.get_order_detail(order_id)
+            # 重试3次获取订单详情
+            detail = None
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    detail = self.client.get_order_detail(order_id)
+                    break
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        time.sleep(3)  # 重试前等待1秒
+                    else:
+                        raise  # 最后一次失败则抛出异常
+            
             with open(cache_file, "w") as f:
                 json.dump(detail, f)
         return detail
