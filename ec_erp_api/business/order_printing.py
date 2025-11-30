@@ -77,18 +77,19 @@ class PrintOrderThread(threading.Thread):
         batch_size = self.download_pdf_batch_size
         order_list = self.task.order_list
         total_orders = len(order_list)
-        
+        pre_success_count = 0
         # 调用_group_order_list下载pdf，需要保证打印是否成功, 如果失败则返回失败
         for i in range(0, total_orders, batch_size):
             batch_orders = order_list[i:i + batch_size]
             self.log(f"处理订单批次 {i // batch_size + 1}，包含 {len(batch_orders)} 个订单")
             append_log_to_task(self.task, f"处理订单批次 {i // batch_size + 1}，包含 {len(batch_orders)} 个订单")
-            if not self._group_order_list(batch_orders):
+            if not self._group_order_list(batch_orders, pre_success_count):
                 return False
+            pre_success_count += len(batch_orders)
         
         return True
 
-    def _group_order_list(self, order_list: list):
+    def _group_order_list(self, order_list: list, pre_success_count: int):
         order_id_list = []
         platform_order_no_list = []
         picking_note_list = []
@@ -117,7 +118,7 @@ class PrintOrderThread(threading.Thread):
                 self.logger.error(traceback.format_exc())
         self._update_task_step("downloaded_all_pdf")
         if os.path.isfile(origin_all_pdf_file):
-            return self._split_and_note_pdf(origin_all_pdf_file, platform_order_no_list, picking_note_list)
+            return self._split_and_note_pdf(origin_all_pdf_file, platform_order_no_list, picking_note_list, pre_success_count)
         else:
             self.task.current_step = "从bigseller下载pdf异常。"
             append_log_to_task(self.task, f"download origin_all_pdf_file pdf failed.")
@@ -333,7 +334,7 @@ class PrintOrderThread(threading.Thread):
                 self._save_task()
                 return
 
-    def _split_and_note_pdf(self, origin_all_pdf_file, platform_order_no_list, picking_note_list):
+    def _split_and_note_pdf(self, origin_all_pdf_file, platform_order_no_list, picking_note_list, pre_success_count: int):
         """
 
         :param origin_all_pdf_file:
@@ -378,7 +379,7 @@ class PrintOrderThread(threading.Thread):
             self.print_pdf_writer.add_page(page)
         split_writer.close()
         # self.print_pdf_writer.add_metadata(reader.metadata)
-        if idx != len(platform_order_no_list) or len(self.pdf_list) != len(platform_order_no_list):
+        if idx != len(platform_order_no_list) or len(self.pdf_list) != len(platform_order_no_list) + pre_success_count:
             self.log(f"print task {self.task.task_id} _split_and_note_pdf 异常， 拆分pdf数和订单数不匹配")
             append_log_to_task(self.task, "_split_and_note_pdf 异常， 拆分pdf数和订单数不匹配")
             return False
