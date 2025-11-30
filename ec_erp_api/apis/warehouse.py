@@ -92,12 +92,19 @@ def search_wait_print_order():
         
         # 截取准确的数量（最后一批可能超出）
         rows = all_rows[:page_size]
+    remain_keys = [
+        "id", "platformOrderId", "packageNo", "shippingCarrierName", "trackingNo", "multilingualViewStatus", "amount", "platform"
+    ]
+    formated_rows = []
     for item in rows:
-        del item["orderItemList"]
+        formated_row = {}
+        for key in remain_keys:
+            formated_row[key] = item[key]
+        formated_rows.append(formated_row)
     return response_util.pack_json_response(
         {
             "total": total,
-            "list": rows
+            "list": formated_rows
         }
     )
 
