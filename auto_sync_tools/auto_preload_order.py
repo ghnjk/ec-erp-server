@@ -463,11 +463,15 @@ def auto_preload_new_order():
             print(report)
             logger.info("[auto_preload_new_order] ========== 处理新订单完成 ==========\n")
             return
-
-        # 步骤2：标记订单为待打印
-        total_marked, successful_order_ids, failed_order_ids = _mark_orders_to_wait_print(client, all_orders)
-        logger.info(f"[auto_preload_new_order] 步骤2完成：标记成功 {total_marked} 个订单")
-
+        failed_order_ids = []
+        successful_order_ids = []
+        total_marked = 0
+        # # 步骤2：标记订单为待打印
+        # total_marked, successful_order_ids, failed_order_ids = _mark_orders_to_wait_print(client, all_orders)
+        # logger.info(f"[auto_preload_new_order] 步骤2完成：标记成功 {total_marked} 个订单")
+        for idx, order in enumerate(all_orders, 1):
+            order_id = order.get("id")
+            successful_order_ids.append(order_id)
         # 步骤3：缓存标记成功的订单详情
         total_cached = _cache_order_details_if_not_exist(client, successful_order_ids)
         logger.info(f"[auto_preload_new_order] 步骤3完成：缓存成功 {total_cached} 个订单详情")
