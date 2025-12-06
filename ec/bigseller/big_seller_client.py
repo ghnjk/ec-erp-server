@@ -1603,7 +1603,8 @@ class BigSellerClient:
         res = self.get(url).json()
         if res["code"] != 0:
             print(f"get_order_detail failed.")
-            print(json.dumps(res, indent=2))
+            print(json.dumps(res, indent=2, ensure_ascii=False))
+            self.logger.error(f"get_order_detail failed. {json.dumps(res, indent=2, ensure_ascii=False)}")
             raise Exception(f"get_order_detail failed.")
         return res["data"]["orderDetail"]
 
