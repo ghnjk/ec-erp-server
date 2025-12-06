@@ -6,6 +6,7 @@
 @create: 2024/3/4
 """
 import os
+import time
 from ec_erp_api.app_config import get_app_config
 from ec.bigseller.big_seller_client import BigSellerClient
 from ec.shop_manager import ShopManager
@@ -15,15 +16,28 @@ from ec_erp_api.common.singleton import CachedSingletonInstanceHolder
 
 __BIG_SELLER_CLIENT__ = CachedSingletonInstanceHolder(timeout_sec=300)
 __SKU_MANAGER__ = CachedSingletonInstanceHolder(timeout_sec=60)
+__BIG_SELLER_LOGIN_TIME__ = None
+__BIG_SELLER_LOGIN_TIMEOUT_SEC__ = 300  # 5分钟
 
 
 def build_big_seller_client() -> BigSellerClient:
+    global __BIG_SELLER_LOGIN_TIME__
+    
+    # 检查客户端是否存在
     if __BIG_SELLER_CLIENT__.get() is None:
         config = get_app_config()
         cookies_dir = config.get("cookies_dir", "../cookies")
         __BIG_SELLER_CLIENT__.set(BigSellerClient(config["ydm_token"],
                                                   cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies")))
         __BIG_SELLER_CLIENT__.get().login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+        __BIG_SELLER_LOGIN_TIME__ = time.time()
+    else:
+        # 检查登录态是否过期（超过5分钟）
+        current_time = time.time()
+        if __BIG_SELLER_LOGIN_TIME__ is not None and (current_time - __BIG_SELLER_LOGIN_TIME__) > __BIG_SELLER_LOGIN_TIMEOUT_SEC__:
+            config = get_app_config()
+            __BIG_SELLER_CLIENT__.get().login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+            __BIG_SELLER_LOGIN_TIME__ = current_time
 
     return __BIG_SELLER_CLIENT__.get()
 
