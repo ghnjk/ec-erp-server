@@ -10,6 +10,7 @@ import os
 import time
 import typing
 import logging
+import tempfile
 import requests
 from ec.verifycode.ydm_verify import YdmVerify
 from ec_erp_api.common.rate_limiter import RateLimiter
@@ -89,8 +90,30 @@ class BigSellerClient:
         raise Exception("get_valid_verify_code failed.")
 
     def save_cookies(self):
-        with open(self.cookies_file_path, "w") as f:
-            f.write(json.dumps(self.session.cookies.get_dict(), indent=2))
+        """保存cookies到文件，使用临时文件和原子操作"""
+        cookies_dir = os.path.dirname(self.cookies_file_path)
+        if cookies_dir and not os.path.exists(cookies_dir):
+            os.makedirs(cookies_dir, exist_ok=True)
+        
+        # 使用临时文件，确保原子写入
+        with tempfile.NamedTemporaryFile(
+            mode='w',
+            dir=cookies_dir,
+            delete=False,
+            suffix='.tmp',
+            prefix='.bigseller_cookies'
+        ) as tmp_file:
+            tmp_file_path = tmp_file.name
+            json.dump(self.session.cookies.get_dict(), tmp_file, indent=2)
+        
+        # 原子操作：移动临时文件到目标位置
+        try:
+            os.replace(tmp_file_path, self.cookies_file_path)
+        except Exception as e:
+            # 如果原子操作失败，清理临时文件
+            if os.path.exists(tmp_file_path):
+                os.remove(tmp_file_path)
+            raise e
 
     def load_cookies(self):
         if not os.path.isfile(self.cookies_file_path):

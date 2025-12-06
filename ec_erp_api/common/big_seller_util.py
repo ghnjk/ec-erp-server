@@ -17,7 +17,7 @@ from ec_erp_api.common.singleton import CachedSingletonInstanceHolder
 __BIG_SELLER_CLIENT__ = CachedSingletonInstanceHolder(timeout_sec=300)
 __SKU_MANAGER__ = CachedSingletonInstanceHolder(timeout_sec=60)
 __BIG_SELLER_LOGIN_TIME__ = None
-__BIG_SELLER_LOGIN_TIMEOUT_SEC__ = 300  # 5分钟
+__BIG_SELLER_LOGIN_TIMEOUT_SEC__ = 60  # 5分钟
 
 
 def build_big_seller_client() -> BigSellerClient:
@@ -32,6 +32,7 @@ def build_big_seller_client() -> BigSellerClient:
         __BIG_SELLER_CLIENT__.get().login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
         __BIG_SELLER_LOGIN_TIME__ = time.time()
     else:
+        __BIG_SELLER_CLIENT__.get().load_cookies()
         # 检查登录态是否过期（超过5分钟）
         current_time = time.time()
         if __BIG_SELLER_LOGIN_TIME__ is not None and (current_time - __BIG_SELLER_LOGIN_TIME__) > __BIG_SELLER_LOGIN_TIMEOUT_SEC__:
