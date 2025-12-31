@@ -58,6 +58,8 @@ class PrintOrderThread(threading.Thread):
                 self._gen_merge_pdf()
                 # 添加所有打单编辑
                 self._mark_all_order_printed()
+                # 压缩pdf
+                self._compress_pdf(self.print_pdf_file_path)
                 # 设置下载地址
                 self.task.pdf_file_url = self.print_pdf_url
                 self._update_task_step("pdf_ready")
@@ -70,6 +72,61 @@ class PrintOrderThread(threading.Thread):
             append_log_to_task(self.task, f"EXCEPTION {self.task.task_id} process async task error: {e}")
             append_log_to_task(self.task, traceback.format_exc())
             self._save_task()
+    
+    def _compress_pdf(self, pdf_file_path: str):
+        """
+        压缩pdf
+            1) 将pdf_file_path拷贝到到pdf_file_path.origin.pdf
+            2) 使用pdf_file_path.origin.pdf压缩pdf
+        :param pdf_file_path:
+        :return:
+        """
+        import shutil
+        try:
+            if not os.path.isfile(pdf_file_path):
+                self.log(f"PDF文件不存在，跳过压缩: {pdf_file_path}")
+                return
+            
+            # 获取原始文件大小
+            original_size = os.path.getsize(pdf_file_path)
+            self.log(f"开始压缩PDF，原始大小: {original_size / 1024 / 1024:.2f} MB")
+            
+            # 1) 备份原文件
+            origin_backup_path = pdf_file_path + ".origin.pdf"
+            shutil.copy2(pdf_file_path, origin_backup_path)
+            
+            # 2) 使用PyPDF2压缩PDF
+            reader = PdfReader(origin_backup_path)
+            writer = PdfWriter()
+            
+            for page in reader.pages:
+                # 压缩页面内容流
+                page.compress_content_streams()
+                writer.add_page(page)
+            
+            # 移除无用的对象以减小文件大小
+            writer.add_metadata(reader.metadata or {})
+            
+            # 写入压缩后的文件
+            with open(pdf_file_path, "wb") as output_file:
+                writer.write(output_file)
+            
+            # 获取压缩后文件大小
+            compressed_size = os.path.getsize(pdf_file_path)
+            compression_ratio = (1 - compressed_size / original_size) * 100 if original_size > 0 else 0
+            
+            self.log(f"PDF压缩完成，压缩后大小: {compressed_size / 1024 / 1024:.2f} MB，"
+                     f"压缩率: {compression_ratio:.1f}%")
+            append_log_to_task(self.task, f"PDF压缩完成，原始: {original_size / 1024 / 1024:.2f} MB，"
+                               f"压缩后: {compressed_size / 1024 / 1024:.2f} MB，压缩率: {compression_ratio:.1f}%")
+            
+            # 删除备份文件（可选，如果不需要保留原始文件）
+            # os.remove(origin_backup_path)
+            
+        except Exception as e:
+            self.log(f"PDF压缩失败: {e}")
+            self.logger.error(traceback.format_exc())
+            append_log_to_task(self.task, f"PDF压缩失败: {e}")
 
     def _download_all_order_pdf(self):
         self.print_pdf_writer = PdfWriter()
