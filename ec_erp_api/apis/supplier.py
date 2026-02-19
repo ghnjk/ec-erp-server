@@ -286,12 +286,15 @@ def search_sku_purchase_price():
 def search_purchase_order():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
+    order_type = request_util.get_int_param("order_type")
+    if order_type is None or order_type not in (1, 2):
+        return response_util.pack_error_response(1003, "order_type参数无效，必须为1(境内进货)或2(境外线下)")
     current_page = request_util.get_int_param("current_page")
     page_size = request_util.get_int_param("page_size")
     offset = (current_page - 1) * page_size
     if offset < 0:
         offset = 0
-    total, records = request_context.get_backend().search_purchase_order(offset, page_size)
+    total, records = request_context.get_backend().search_purchase_order(offset, page_size, order_type)
     return response_util.pack_pagination_result(total, records)
 
 
@@ -361,9 +364,13 @@ def build_purchase_order_from_req() -> PurchaseOrder:
             "shipping_stock_quantity": sku_info.shipping_stock_quantity,
             "check_in_quantity": int(item["check_in_quantity"])
         })
+    order_type = request_util.get_int_param("order_type")
+    if order_type is None or order_type not in (1, 2):
+        raise Exception("order_type参数无效，必须为1(境内进货)或2(境外线下)")
     order = PurchaseOrder(
         purchase_order_id=request_util.get_int_param("purchase_order_id"),
         project_id=request_context.get_current_project_id(),
+        order_type=order_type,
         supplier_id=supplier.supplier_id,
         supplier_name=supplier.supplier_name,
         purchase_step=request_util.get_str_param("purchase_step"),
@@ -389,6 +396,8 @@ def save_purchase_order():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
     order = build_purchase_order_from_req()
+    if order.order_type is None or order.order_type not in (1, 2):
+        return response_util.pack_error_response(1003, "order_type参数无效，必须为1(境内进货)或2(境外线下)")
     request_context.get_backend().store_purchase_order(order)
     return response_util.pack_response({})
 
@@ -468,32 +477,98 @@ def sync_stock_to_erp(order: PurchaseOrder):
         return response_util.pack_response(res)
 
 
+def sync_stock_out_to_erp(order: PurchaseOrder):
+    """
+    境外线下采购单同步ERP出库（inoutTypeId=1002）
+    """
+    config = get_app_config()
+    cookies_dir = config.get("cookies_dir", "../cookies")
+    client = BigSellerClient(config["ydm_token"], cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))
+    client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+    sync_id = f"OUT-EC-PO-{order.purchase_order_id}"
+    stock_list = []
+    for item in order.store_skus:
+        sku = item["sku"]
+        print(f"sync_stock_out_to_erp add sku {sku}")
+        sku_info = request_context.get_backend().get_sku(sku)
+        if sku_info is None:
+            return response_util.pack_error_response(1004, f"SKU {sku} 未找到")
+        if not sku_info.erp_sku_id:
+            return response_util.pack_error_response(1004, f"SKU {sku} 没有关联的ERP SKU ID")
+        stock_list.append({
+            "skuId": int(sku_info.erp_sku_id),
+            "stockPrice": None,
+            "shelfList": [
+                {
+                    "shelfId": config["big_seller_shelf_id"],
+                    "shelfName": config["big_seller_shelf_name"],
+                    "stockQty": item["check_in_quantity"] * item["sku_unit_quantity"]
+                }
+            ]
+        })
+    if len(stock_list) == 0:
+        return response_util.pack_error_response(1004, "没有有效的SKU需要出库")
+    req = {
+        "detailsAddBoList": stock_list,
+        "id": "",
+        "inoutTypeId": "1002",
+        "isAutoInoutStock": 1,
+        "note": f"ec-erp 境外线下销售单：{order.purchase_order_id} [出库单={sync_id}]",
+        "warehouseId": config["big_seller_warehouse_id"],
+        "zoneId": None
+    }
+    print("sync_stock_out_to_erp req: ", json.dumps(req))
+    res = client.add_stock_to_erp(req)
+    print("sync_stock_out_to_erp res: ", json.dumps(res))
+    success = res["successNum"]
+    fail = res["failNum"]
+    print(f"境外采购出库ERP： 成功： {success} 失败： {fail}")
+    if fail > 0:
+        return response_util.pack_error_response(1004, f"境外采购出库ERP： 成功： {success} 失败： {fail}")
+    else:
+        return response_util.pack_response(res)
+
+
 @supplier_apis.route('/submit_purchase_order_and_next_step', methods=["POST"])
 @api_post_request()
 def submit_purchase_order_and_next_step():
     """
-    采购流程图：
+    类型1(境内进货)采购流程图：
     草稿 -- 选择采购物品，提交采购单 -->
     供应商捡货中 -- 厂家提供采购清单，采购单确认 -->
     待发货 -- 厂家发货，填写海运公司，填写港口，填写海运费， 预计到达日期 -->
     海运中 -- 抵达海外仓库，点货入库 -->
     已入库 -- 同步erp -->
     完成
+
+    类型2(境外线下)采购流程图：
+    草稿 -- 选择采购物品，提交采购单 -->
+    境外拣货 -- 确认出货 -->
+    已出库 -- 同步ERP出库 -->
+    完成
     :return:
     """
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
     order = build_purchase_order_from_req()
+    if order.order_type is None or order.order_type not in (1, 2):
+        return response_util.pack_error_response(1003, "order_type参数无效，必须为1(境内进货)或2(境外线下)")
+    if order.order_type == 1:
+        return _submit_purchase_order_type1(order)
+    else:
+        return _submit_purchase_order_type2(order)
+
+
+def _submit_purchase_order_type1(order: PurchaseOrder):
+    """境内进货采购单流程扭转"""
     if order.purchase_step == "草稿":
         order.purchase_skus = remove_empty_sku(order.purchase_skus)
         order.purchase_step = "供应商捡货中"
     elif order.purchase_step == "供应商捡货中":
         order.purchase_skus = remove_empty_sku(order.purchase_skus)
-        # 确认是否存在待定的sku
         for item in order.purchase_skus:
             if item["quantity"] is None:
-                return response_util.pack_error_response(1004, "存在未确定数量的sku•")
-        # 更新供应价到db
+                return response_util.pack_error_response(1004, "存在未确定数量的sku")
         save_purchase_price(order)
         order.purchase_date = datetime.datetime.now().strftime("%Y-%m-%d")
         order.purchase_step = "待发货"
@@ -508,6 +583,31 @@ def submit_purchase_order_and_next_step():
         order.purchase_step = "已入库"
     elif order.purchase_step == "已入库":
         sync_stock_to_erp(order)
+        order.purchase_step = "完成"
+    else:
+        raise Exception("非法状态")
+    request_context.get_backend().store_purchase_order(order)
+    return response_util.pack_response(DtoUtil.to_dict(order))
+
+
+def _submit_purchase_order_type2(order: PurchaseOrder):
+    """境外线下采购单流程扭转"""
+    if order.purchase_step == "草稿":
+        order.purchase_skus = remove_empty_sku(order.purchase_skus)
+        for item in order.purchase_skus:
+            if item["quantity"] is None:
+                return response_util.pack_error_response(1004, "存在未确定数量的sku")
+        order.purchase_date = datetime.datetime.now().strftime("%Y-%m-%d")
+        order.store_skus = [
+            copy.deepcopy(e) for e in order.purchase_skus
+        ]
+        for item in order.store_skus:
+            item["check_in_quantity"] = item["quantity"]
+        order.purchase_step = "境外拣货"
+    elif order.purchase_step == "境外拣货":
+        order.purchase_step = "已出库"
+    elif order.purchase_step == "已出库":
+        sync_stock_out_to_erp(order)
         order.purchase_step = "完成"
     else:
         raise Exception("非法状态")

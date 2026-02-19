@@ -235,7 +235,7 @@ class SkuPurchasePriceDto(DtoBase):
 
 class PurchaseOrder(DtoBase):
     """
-    商品SKU采购价
+    商品SKU采购单
     """
     __tablename__ = "t_purchase_order"
     __table_args__ = ({
@@ -244,15 +244,12 @@ class PurchaseOrder(DtoBase):
     purchase_order_id: Mapped[int] = Column('Fpurchase_order_id', Integer, primary_key=True, autoincrement=True,
                                             comment="采购单id")
     project_id: Mapped[str] = Column('Fproject_id', String(128), comment='所属项目ID')
+    order_type: Mapped[int] = Column('Forder_type', Integer, default=1, server_default="1", index=True,
+                                     comment='采购单类型, 1: 境内进货采购单, 2: 境外线下采购单')
     supplier_id: Mapped[int] = Column('Fsupplier_id', Integer, comment='供应商id')
     supplier_name: Mapped[str] = Column('Fsupplier_name', String(128), index=True, comment='供应商名')
-    # 采购步骤主要有：
-    # 草稿
-    # 供应商捡货中
-    # 待发货
-    # 已入库
-    # 完成
-    # 废弃
+    # 类型1(境内进货)采购步骤：草稿 → 供应商捡货中 → 待发货 → 海运中 → 已入库 → 完成 / 废弃
+    # 类型2(境外线下)采购步骤：草稿 → 境外拣货 → 已出库 → 完成 / 废弃
     purchase_step: Mapped[str] = Column('Fpurchase_step', String(128), index=True, comment='采购状态')
     sku_summary: Mapped[str] = Column('Fsku_summary', String(10240), default="", server_default="", comment='货物概述')
     sku_amount: Mapped[int] = Column('Fsku_amount', Integer, default=0, server_default="0", comment='sku采购金额')
@@ -305,7 +302,7 @@ class PurchaseOrder(DtoBase):
     modify_time: Mapped[datetime] = Column('Fmodify_time', DateTime, index=True, default=datetime.now(),
                                            server_default=sql.func.now(), comment='修改时间')
     columns = [
-        "purchase_order_id", "project_id", "supplier_id", "supplier_name",
+        "purchase_order_id", "project_id", "order_type", "supplier_id", "supplier_name",
         "purchase_step", "sku_summary", "sku_amount", "pay_amount", "pay_state", "purchase_date",
         "expect_arrive_warehouse_date", "maritime_port", "shipping_company",
         "shipping_fee", "arrive_warehouse_date",
@@ -848,7 +845,8 @@ class MysqlBackend(object):
         session = self.DBSession()
         q = session.query(PurchaseOrder).filter(PurchaseOrder.project_id == self.project_id).filter(
             PurchaseOrder.purchase_step.in_([
-                "待发货", "海运中", "已入库"
+                "待发货", "海运中", "已入库",
+                "境外拣货", "已出库"
             ])
         ).order_by(
             PurchaseOrder.purchase_order_id.desc())
@@ -856,10 +854,13 @@ class MysqlBackend(object):
         session.close()
         return records
 
-    def search_purchase_order(self, offset, limit) -> typing.Tuple[int, typing.List[PurchaseOrder]]:
+    def search_purchase_order(self, offset, limit, order_type: int = None) -> typing.Tuple[
+            int, typing.List[PurchaseOrder]]:
         session = self.DBSession()
-        q = session.query(PurchaseOrder).filter(PurchaseOrder.project_id == self.project_id).order_by(
-            PurchaseOrder.purchase_order_id.desc())
+        q = session.query(PurchaseOrder).filter(PurchaseOrder.project_id == self.project_id)
+        if order_type is not None:
+            q = q.filter(PurchaseOrder.order_type == order_type)
+        q = q.order_by(PurchaseOrder.purchase_order_id.desc())
         total = q.count()
         q = q.offset(offset).limit(limit)
         records = q.all()
