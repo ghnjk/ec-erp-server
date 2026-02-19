@@ -317,9 +317,19 @@ def query_sku_purchase_price():
 
 
 def build_purchase_order_from_req() -> PurchaseOrder:
-    supplier = request_context.get_backend().get_supplier(request_util.get_int_param("supplier_id"))
-    if supplier is None:
-        raise Exception("供应商不存在")
+    order_type = request_util.get_int_param("order_type")
+    if order_type is None or order_type not in (1, 2):
+        raise Exception("order_type参数无效，必须为1(境内进货)或2(境外线下)")
+
+    if order_type == 2:
+        supplier_id = -1
+        supplier_name = "线下销售"
+    else:
+        supplier = request_context.get_backend().get_supplier(request_util.get_int_param("supplier_id"))
+        if supplier is None:
+            raise Exception("供应商不存在")
+        supplier_id = supplier.supplier_id
+        supplier_name = supplier.supplier_name
     purchase_skus = request_util.get_param("purchase_skus", [])
     format_purchase_skus = []
     sku_amount = 0
@@ -364,15 +374,12 @@ def build_purchase_order_from_req() -> PurchaseOrder:
             "shipping_stock_quantity": sku_info.shipping_stock_quantity,
             "check_in_quantity": int(item["check_in_quantity"])
         })
-    order_type = request_util.get_int_param("order_type")
-    if order_type is None or order_type not in (1, 2):
-        raise Exception("order_type参数无效，必须为1(境内进货)或2(境外线下)")
     order = PurchaseOrder(
         purchase_order_id=request_util.get_int_param("purchase_order_id"),
         project_id=request_context.get_current_project_id(),
         order_type=order_type,
-        supplier_id=supplier.supplier_id,
-        supplier_name=supplier.supplier_name,
+        supplier_id=supplier_id,
+        supplier_name=supplier_name,
         purchase_step=request_util.get_str_param("purchase_step"),
         sku_amount=sku_amount,
         pay_amount=request_util.get_int_param("pay_amount", 0),
