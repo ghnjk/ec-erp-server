@@ -322,7 +322,7 @@ def build_purchase_order_from_req() -> PurchaseOrder:
         raise Exception("order_type参数无效，必须为1(境内进货)或2(境外线下)")
 
     if order_type == 2:
-        supplier_id = -1
+        supplier_id = 10000000
         supplier_name = "线下销售"
     else:
         supplier = request_context.get_backend().get_supplier(request_util.get_int_param("supplier_id"))
@@ -612,6 +612,8 @@ def _submit_purchase_order_type2(order: PurchaseOrder):
             item["check_in_quantity"] = item["quantity"]
         order.purchase_step = "境外拣货"
     elif order.purchase_step == "境外拣货":
+        # 保存价格
+        save_purchase_price(order)
         order.purchase_step = "已出库"
     elif order.purchase_step == "已出库":
         sync_stock_out_to_erp(order)
