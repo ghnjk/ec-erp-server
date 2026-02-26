@@ -144,6 +144,7 @@ class OrderAnalysis(object):
             platform_order_no = order["platformOrderId"]
             # 直接查询erp的订单详情的sku匹配结果
             detail = self._get_order_detail(order_id)
+            order["splitOrder"] = detail.get("splitOrder", False)
             sku_match_detail = []
             for item in detail["orderItemVoList"]:
                 allocated = item["allocated"]
