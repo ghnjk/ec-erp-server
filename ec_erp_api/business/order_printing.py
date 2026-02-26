@@ -217,10 +217,10 @@ class PrintOrderThread(threading.Thread):
         self.base_dir = base_dir
         self.print_pdf_file_path = os.path.join(base_dir, f"{self.task.task_id}.all.pdf")
         self.print_pdf_url = f"/print/{self.task.task_id}/{self.task.task_id}.all.pdf"
-        for item in self.task.order_list:
+        for idx, item in enumerate(self.task.order_list):
             order_no = item["platformOrderId"]
-            order_info_file = os.path.join(self.base_dir, f"split.{order_no}.order.json")
-            sku_match_info_file = os.path.join(self.base_dir, f"split.{order_no}.sku.match.json")
+            order_info_file = os.path.join(self.base_dir, f"split.{order_no}.{idx}.order.json")
+            sku_match_info_file = os.path.join(self.base_dir, f"split.{order_no}.{idx}.sku.match.json")
             with open(order_info_file, "w") as fp:
                 json.dump(item, fp, indent=2, ensure_ascii=False)
             with open(sku_match_info_file, "w") as fp:
