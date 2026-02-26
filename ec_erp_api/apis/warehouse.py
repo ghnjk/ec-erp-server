@@ -136,6 +136,45 @@ class OrderAnalysis(object):
         self.sku_sample_desc = {}
 
     def parse_all_orders(self, order_list):
+        # 拆单逻辑中，父单的orderItemVoList有所有的子单信息，需要根据order_item_vo_id去掉子单信息
+        # 获取所有订单的详情
+        order_detail_list = [] # [(order, detail), ...]
+        # 将所有的父单先找出来
+        # key=shop_id+platform_order_no
+        # value={
+        #    "parent_order": {},
+        #    "child_order_item_vo_id_list": []
+        # }
+        split_order_maps = {} 
+        for order in order_list:
+            order_id = order["id"]
+            detail = self._get_order_detail(order_id)
+            order_detail_list.append((order, detail))
+            is_split_order = detail.get("splitOrder", False)
+            if is_split_order:
+                shop_id = order["shopId"]
+                platform_order_no = order["platformOrderNo"]
+                key = f"{shop_id}_{platform_order_no}"
+                split_order_maps[key] = {
+                    "parent_order": order,
+                    "child_order_item_vo_id_list": []
+                }
+        # 针对所有父单，找到子单
+        for key, value in split_order_maps.items():
+            parent_order = value["parent_order"]
+            shop_id = parent_order["shopId"]
+            platform_order_no = parent_order["platformOrderNo"]
+            # 遍历所有订单，找到相同shop_id和platform_order_no的订单
+            for order, detail in order_detail_list:
+                sub_shop_id = order["shopId"]
+                sub_platform_order_no = order["platformOrderNo"]
+                if detail.get("splitOrder", False):
+                    # 父单不需要
+                    continue
+                if sub_shop_id == shop_id and sub_platform_order_no == platform_order_no:
+                    # 将detail中orderItemVoList的id加入到child_order_item_vo_id_list中
+                    value["child_order_item_vo_id_list"].extend([item["id"] for item in detail["orderItemVoList"]])
+        # 统计拣货备注信息
         for order in order_list:
             shop_id = order["shopId"]
             counter = OrderSkuCounter()
@@ -144,9 +183,15 @@ class OrderAnalysis(object):
             platform_order_no = order["platformOrderId"]
             # 直接查询erp的订单详情的sku匹配结果
             detail = self._get_order_detail(order_id)
-            order["splitOrder"] = detail.get("splitOrder", False)
+            is_split_order = detail.get("splitOrder", False)
+            order["is_split_order"] = is_split_order
+            split_order_map_key = f"{shop_id}_{platform_order_no}"
             sku_match_detail = []
             for item in detail["orderItemVoList"]:
+                order_item_vo_id = item["id"]
+                # 如果是父单，需要判断order_item_vo_id是否在child_order_item_vo_id_list中，如果是，则需要忽略
+                if is_split_order and order_item_vo_id in split_order_maps[split_order_map_key]["child_order_item_vo_id_list"]:
+                    continue
                 allocated = item["allocated"]
                 allocating = item["allocating"]
                 if allocated != allocating:
@@ -161,7 +206,8 @@ class OrderAnalysis(object):
                     "var_sku": var_sku,
                     "inventory_sku": inventory_sku,
                     "var_sku_group_list": var_sku_group_list,
-                    "allocated": allocated
+                    "allocated": allocated,
+                    "order_item_vo_id": order_item_vo_id
                 })
                 if var_sku_group_list is None or len(var_sku_group_list) == 0:
                     # 单1sku
