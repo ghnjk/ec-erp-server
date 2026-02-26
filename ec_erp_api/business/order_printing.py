@@ -417,12 +417,13 @@ class PrintOrderThread(threading.Thread):
             page.add_transformation(Transformation().translate(0, transfer_y))
             # all merge page <<
             if page_text.find(f"Order No:{order_no}") >= 0 or page_text.find(f"Order No: {order_no}") >= 0:
-                origin_pdf_file = os.path.join(self.base_dir, f"split.{order_no}.origin.pdf")
+                split_succ_idx = pre_success_count + idx
+                origin_pdf_file = os.path.join(self.base_dir, f"split.{order_no}.{split_succ_idx}.origin.pdf")
                 split_writer.write(origin_pdf_file)
                 split_writer.close()
                 picking_notes = picking_note_list[idx]
-                noted_pdf_file = os.path.join(self.base_dir, f"split.{order_no}.noted.pdf")
-                picking_note_file = os.path.join(self.base_dir, f"split.{order_no}.noted.json")
+                noted_pdf_file = os.path.join(self.base_dir, f"split.{order_no}.{split_succ_idx}.noted.pdf")
+                picking_note_file = os.path.join(self.base_dir, f"split.{order_no}.{split_succ_idx}.noted.json")
                 with open(picking_note_file, "w") as fp:
                     json.dump(picking_notes, fp, indent=2, ensure_ascii=False)
                 self._add_note_to_pdf(origin_pdf_file, noted_pdf_file, picking_notes)
