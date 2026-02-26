@@ -153,7 +153,7 @@ class OrderAnalysis(object):
             is_split_order = detail.get("splitOrder", False)
             if is_split_order:
                 shop_id = order["shopId"]
-                platform_order_no = order["platformOrderNo"]
+                platform_order_no = order["platformOrderId"]
                 key = f"{shop_id}_{platform_order_no}"
                 split_order_maps[key] = {
                     "parent_order": order,
@@ -163,11 +163,11 @@ class OrderAnalysis(object):
         for key, value in split_order_maps.items():
             parent_order = value["parent_order"]
             shop_id = parent_order["shopId"]
-            platform_order_no = parent_order["platformOrderNo"]
+            platform_order_no = parent_order["platformOrderId"]
             # 遍历所有订单，找到相同shop_id和platform_order_no的订单
             for order, detail in order_detail_list:
                 sub_shop_id = order["shopId"]
-                sub_platform_order_no = order["platformOrderNo"]
+                sub_platform_order_no = order["platformOrderId"]
                 if detail.get("splitOrder", False):
                     # 父单不需要
                     continue
