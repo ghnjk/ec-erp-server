@@ -1,0 +1,377 @@
+version: 1.0
+project:
+  name: ec-erp-server
+  description: 电商 ERP 后台服务系统，管理供应商、仓库、SKU、订单等业务流程，支持多国家/地区部署。
+  language: Python 3
+  frameworks:
+    - Flask
+    - SQLAlchemy 1.4.51
+    - Elasticsearch 7.14.2
+  databases:
+    - MySQL (主存储)
+    - Elasticsearch (销售统计/订单分析)
+  third_party_integrations:
+    - BigSeller (电商 ERP)
+    - jfbym (验证码识别)
+  multi_project_support:
+    - philipine (菲律宾)
+    - india (印度)
+    - malaysia (马来西亚)
+    - thailand (泰国)
+
+specs:
+  - id: ec_erp_app
+    title: 应用入口与全局配置规约
+    file: ec_erp_app_spec.md
+    summary: Flask 应用入口、Blueprint 注册、日志体系、Session、静态资源、配置文件加载与多 project 支持。
+    key_files:
+      - ec_erp_app.py
+      - ec_erp_api/app_config.py
+      - conf/application.json
+
+  - id: system_module
+    title: System 模块规约（系统/登录）
+    file: system_module_spec.md
+    summary: 用户认证与登录，提供 Token 登录、账号密码登录、用户信息查询。
+    blueprint: system_apis
+    url_prefix: /erp_api/system
+    permission: 无需权限校验（仅登录态）
+    routes_count: 3
+    key_files:
+      - ec_erp_api/apis/system.py
+
+  - id: supplier_module
+    title: Supplier 模块规约（供应商/SKU/采购）
+    file: supplier_module_spec.md
+    summary: 供应商管理、SKU 主数据、采购价格、采购订单全流程（含状态机推进与 BigSeller 入出库联动）。
+    blueprint: supplier_apis
+    url_prefix: /erp_api/supplier
+    permission: PMS_SUPPLIER (supply)
+    routes_count: 10
+    purchase_order_states:
+      - 草稿
+      - 供应商捡货中
+      - 待发货
+      - 海运中
+      - 已入库
+      - 完成
+    key_files:
+      - ec_erp_api/apis/supplier.py
+
+  - id: warehouse_module
+    title: Warehouse 模块规约（仓库/订单打印）
+    file: warehouse_module_spec.md
+    summary: 仓库订单查询、订单打印异步流水线、SKU 拣货备注管理。
+    blueprint: warehouse_apis
+    url_prefix: /erp_api/warehouse
+    permission: PMS_WAREHOUSE (warehouse)
+    routes_count: 7
+    print_pipeline_steps:
+      - parsed_all_order_info
+      - downloading_order_pdf
+      - merging_pdf
+      - marking_printed
+      - compressing_pdf
+      - pdf_ready
+    key_files:
+      - ec_erp_api/apis/warehouse.py
+      - ec_erp_api/business/order_printing.py
+
+  - id: sale_module
+    title: Sale 模块规约（销售管理）
+    file: sale_module_spec.md
+    summary: SKU 销售单价、销售订单 CRUD 与 BigSeller 出库同步。
+    blueprint: sale_apis
+    url_prefix: /erp_api/sale
+    permission: PMS_SALE (sale)
+    routes_count: 7
+    sale_order_states:
+      - 新建
+      - 已同步
+    key_files:
+      - ec_erp_api/apis/sale.py
+
+  - id: data_model
+    title: 数据模型规约
+    file: data-model/spec.md
+    summary: 11 张核心表 / DTO 类、命名约定、索引、金额单位、多 project 数据隔离与 MysqlBackend CRUD 方法。包含数据库结构变更管理规约（每次库表调整必须遵循的更新流程与 change-log 要求）。
+    tables:
+      - id: t_project_info
+        design: data-model/design/t_project_info.md
+        dto: ProjectDto
+      - id: t_user_info
+        design: data-model/design/t_user_info.md
+        dto: UserDto
+      - id: t_supplier_info
+        design: data-model/design/t_supplier_info.md
+        dto: SupplierDto
+      - id: t_sku_info
+        design: data-model/design/t_sku_info.md
+        dto: SkuDto
+      - id: t_sku_purchase_price
+        design: data-model/design/t_sku_purchase_price.md
+        dto: SkuPurchasePriceDto
+      - id: t_purchase_order
+        design: data-model/design/t_purchase_order.md
+        dto: PurchaseOrder
+      - id: t_sku_sale_estimate
+        design: data-model/design/t_sku_sale_estimate.md
+        dto: SkuSaleEstimateDto
+      - id: t_sku_picking_note
+        design: data-model/design/t_sku_picking_note.md
+        dto: SkuPickingNote
+      - id: t_order_print_task
+        design: data-model/design/t_order_print_task.md
+        dto: OrderPrintTask
+      - id: t_sku_sale_price
+        design: data-model/design/t_sku_sale_price.md
+        dto: SkuSalePrice
+      - id: t_sale_order
+        design: data-model/design/t_sale_order.md
+        dto: SaleOrder
+    key_files:
+      - ec_erp_api/models/mysql_backend.py
+      - docs/ec_erp_db.sql
+      - docs/purchase_order_table_alt.sql
+    change_management:
+      description: 数据库结构变更必须同步更新 ORM、SQL、design 文档、ALTER 脚本，并在对应 design/t_xxx.md 末尾追加 Change-Log。
+      required_steps:
+        - 修改 ec_erp_api/models/mysql_backend.py 中的 DTO
+        - 修改 docs/ec_erp_db.sql 中的 CREATE TABLE
+        - 更新 openspec/specs/data-model/spec.md（如有总览变化）
+        - 更新 openspec/specs/data-model/design/t_xxx.md（字段表 + Change-Log）
+        - 编写 docs/<table>_table_alt_<YYYYMMDD>_<desc>.sql ALTER 脚本
+        - 如有 API 行为变化，同步更新对应模块 spec
+
+  - id: bigseller_integration
+    title: BigSeller 第三方集成规约
+    file: bigseller_integration_spec.md
+    summary: BigSellerClient 登录/Cookie 持久化/验证码识别与全部业务 API；ShopManager / SkuManager / SkuGroupMatcher / YdmVerify。
+    key_files:
+      - ec/bigseller/big_seller_client.py
+      - ec/shop_manager.py
+      - ec/sku_manager.py
+      - ec/sku_group_matcher.py
+      - ec/verifycode/ydm_verify.py
+      - ec_erp_api/common/big_seller_util.py
+
+  - id: auto_sync_tools
+    title: 自动同步任务规约
+    file: auto_sync_tools_spec.md
+    summary: 6 个定时同步脚本（订单预热/退单入库/SKU 主数据/订单 ES/店铺统计 ES/SKU 库存），含 crontab 部署建议。
+    scripts:
+      - auto_preload_order.py
+      - auto_return_refund_order_to_warehouse.py
+      - sync_all_sku.py
+      - sync_order_to_es.py
+      - sync_shop_statics_to_es.py
+      - sync_sku_inventory.py
+    key_files:
+      - auto_sync_tools/
+
+  - id: common_utilities
+    title: 公共工具与装饰器规约
+    file: common_utilities_spec.md
+    summary: api_post_request 装饰器、request_util/response_util、codec_util、request_context、big_seller_util、sku_sale_estimate、rate_limiter、singleton。
+    key_files:
+      - ec_erp_api/common/api_core.py
+      - ec_erp_api/common/request_util.py
+      - ec_erp_api/common/response_util.py
+      - ec_erp_api/common/codec_util.py
+      - ec_erp_api/common/request_context.py
+      - ec_erp_api/common/big_seller_util.py
+      - ec_erp_api/common/sku_sale_estimate.py
+      - ec_erp_api/common/rate_limiter.py
+      - ec_erp_api/common/singleton.py
+
+  - id: tools
+    title: 工具脚本规约
+    file: tools_spec.md
+    summary: 一次性运维与导入工具（init_db / add_user / import_sku / import_supplier_info / import_picking_note）。
+    scripts:
+      - init_db.py
+      - add_user.py
+      - import_sku.py
+      - import_supplier_info.py
+      - import_picking_note.py
+    key_files:
+      - tools/
+
+  - id: coding_standards
+    title: 编码规范规约
+    file: coding_standards_spec.md
+    summary: 文件头格式、命名约定、API 路由模板、响应格式、错误码、日志规范、Dto 定义约束、Git 与文档规范、安全性能要求。
+    key_files:
+      - .cursorrules
+
+permissions:
+  - name: PMS_SUPPLIER
+    value: supply
+    modules: [supplier]
+  - name: PMS_WAREHOUSE
+    value: warehouse
+    modules: [warehouse]
+  - name: PMS_SALE
+    value: sale
+    modules: [sale]
+
+error_codes:
+  "0": 成功
+  "1001": 系统异常
+  "1002": 用户认证失败
+  "1003": 参数错误
+  "1004": 状态机校验失败
+  "1008": 业务执行失败
+
+loggers:
+  - name: ACC
+    file: logs/acc.log
+    purpose: API 访问与响应
+  - name: ERROR
+    file: logs/error.log
+    purpose: 应用错误
+  - name: ASYNC_TASK
+    file: logs/async_task.log
+    purpose: 异步业务任务
+  - name: INVOKER
+    file: logs/invoker.log
+    purpose: 第三方调用
+  - name: sqlalchemy.engine
+    file: logs/sql.log
+    purpose: SQLAlchemy 输出
+
+apis:
+  spec: apis/spec.md
+  total_count: 27
+  by_module:
+    system: 3
+    supplier: 10
+    warehouse: 7
+    sale: 7
+  routes:
+    system:
+      - path: /erp_api/system/login_user_with_token
+        design: apis/design/system/login_user_with_token.md
+        handler: ec_erp_api/apis/system.py:login_user_with_token
+      - path: /erp_api/system/login_user
+        design: apis/design/system/login_user.md
+        handler: ec_erp_api/apis/system.py:login_user
+      - path: /erp_api/system/get_login_user_info
+        design: apis/design/system/get_login_user_info.md
+        handler: ec_erp_api/apis/system.py:get_login_user_info
+    supplier:
+      - path: /erp_api/supplier/search_supplier
+        design: apis/design/supplier/search_supplier.md
+        handler: ec_erp_api/apis/supplier.py:search_supplier
+      - path: /erp_api/supplier/search_sku
+        design: apis/design/supplier/search_sku.md
+        handler: ec_erp_api/apis/supplier.py:search_sku
+      - path: /erp_api/supplier/save_sku
+        design: apis/design/supplier/save_sku.md
+        handler: ec_erp_api/apis/supplier.py:save_sku
+      - path: /erp_api/supplier/add_sku
+        design: apis/design/supplier/add_sku.md
+        handler: ec_erp_api/apis/supplier.py:add_sku
+      - path: /erp_api/supplier/sync_all_sku
+        design: apis/design/supplier/sync_all_sku.md
+        handler: ec_erp_api/apis/supplier.py:sync_all_sku
+      - path: /erp_api/supplier/search_sku_purchase_price
+        design: apis/design/supplier/search_sku_purchase_price.md
+        handler: ec_erp_api/apis/supplier.py:search_sku_purchase_price
+      - path: /erp_api/supplier/query_sku_purchase_price
+        design: apis/design/supplier/query_sku_purchase_price.md
+        handler: ec_erp_api/apis/supplier.py:query_sku_purchase_price
+      - path: /erp_api/supplier/search_purchase_order
+        design: apis/design/supplier/search_purchase_order.md
+        handler: ec_erp_api/apis/supplier.py:search_purchase_order
+      - path: /erp_api/supplier/save_purchase_order
+        design: apis/design/supplier/save_purchase_order.md
+        handler: ec_erp_api/apis/supplier.py:save_purchase_order
+      - path: /erp_api/supplier/submit_purchase_order_and_next_step
+        design: apis/design/supplier/submit_purchase_order_and_next_step.md
+        handler: ec_erp_api/apis/supplier.py:submit_purchase_order_and_next_step
+    warehouse:
+      - path: /erp_api/warehouse/get_wait_print_order_ship_provider_list
+        design: apis/design/warehouse/get_wait_print_order_ship_provider_list.md
+        handler: ec_erp_api/apis/warehouse.py:get_order_statics
+        notes: 函数名与路径名不一致（历史遗留）
+      - path: /erp_api/warehouse/search_wait_print_order
+        design: apis/design/warehouse/search_wait_print_order.md
+        handler: ec_erp_api/apis/warehouse.py:search_wait_print_order
+      - path: /erp_api/warehouse/pre_submit_print_order
+        design: apis/design/warehouse/pre_submit_print_order.md
+        handler: ec_erp_api/apis/warehouse.py:pre_submit_print_order
+      - path: /erp_api/warehouse/search_manual_mark_sku_picking_note
+        design: apis/design/warehouse/search_manual_mark_sku_picking_note.md
+        handler: ec_erp_api/apis/warehouse.py:search_manual_mark_sku_picking_note
+      - path: /erp_api/warehouse/submit_manual_mark_sku_picking_note
+        design: apis/design/warehouse/submit_manual_mark_sku_picking_note.md
+        handler: ec_erp_api/apis/warehouse.py:submit_manual_mark_sku_picking_note
+      - path: /erp_api/warehouse/start_run_print_order_task
+        design: apis/design/warehouse/start_run_print_order_task.md
+        handler: ec_erp_api/apis/warehouse.py:start_run_print_order_task
+      - path: /erp_api/warehouse/query_print_order_task
+        design: apis/design/warehouse/query_print_order_task.md
+        handler: ec_erp_api/apis/warehouse.py:query_print_order_task
+    sale:
+      - path: /erp_api/sale/save_sku_sale_price
+        design: apis/design/sale/save_sku_sale_price.md
+        handler: ec_erp_api/apis/sale.py:save_sku_sale_price
+      - path: /erp_api/sale/search_sku_sale_price
+        design: apis/design/sale/search_sku_sale_price.md
+        handler: ec_erp_api/apis/sale.py:search_sku_sale_price
+      - path: /erp_api/sale/create_sale_order
+        design: apis/design/sale/create_sale_order.md
+        handler: ec_erp_api/apis/sale.py:create_sale_order
+      - path: /erp_api/sale/update_sale_order
+        design: apis/design/sale/update_sale_order.md
+        handler: ec_erp_api/apis/sale.py:update_sale_order
+      - path: /erp_api/sale/delete_sale_order
+        design: apis/design/sale/delete_sale_order.md
+        handler: ec_erp_api/apis/sale.py:delete_sale_order
+      - path: /erp_api/sale/submit_sale_order
+        design: apis/design/sale/submit_sale_order.md
+        handler: ec_erp_api/apis/sale.py:submit_sale_order
+      - path: /erp_api/sale/search_sale_order
+        design: apis/design/sale/search_sale_order.md
+        handler: ec_erp_api/apis/sale.py:search_sale_order
+  change_management:
+    description: 接口变更（新增/修改/删除）必须同步更新代码、design 文档、模块 spec、docs/erp_api/、config.yaml；并在 design/<module>/<action>.md 末尾追加 Change-Log。
+    required_steps:
+      - 修改 ec_erp_api/apis/<module>.py 中的 handler
+      - 修改/新增 openspec/specs/apis/design/<module>/<action>.md
+      - 同步 openspec/specs/<module>_module_spec.md 接口清单
+      - 同步 docs/erp_api/<module>/<action>.md 业务文档
+      - 在 design 文件末尾追加 Change-Log（含变更类型、原因、内容、前端影响、回滚方式、关联代码）
+      - 更新 openspec/specs/config.yaml 中 apis.routes 与 apis.total_count
+      - 不兼容变更（必填参数 / 字段类型 / URL 变更）需要同步升级 ec-erp-static 前端
+
+money_unit_convention:
+  default: 整数（分）
+  exceptions:
+    - table: t_sku_sale_price
+      field: Funit_price
+      type: Float (元)
+    - table: t_sale_order
+      field: Ftotal_amount
+      type: Float (元)
+
+constraints:
+  - name: api_decorator
+    description: 所有 /erp_api/* 接口必须使用 @api_post_request() 装饰器
+  - name: response_format
+    description: 响应使用 response_util.pack_*_response 包装，结构 {result, resultMsg, traceId, data}
+  - name: param_extraction
+    description: 请求参数从 request.json["body"] 取，使用 request_util.get_*_param
+  - name: backend_access
+    description: API 中通过 request_context.get_backend() 获取数据库后端，工具/同步脚本通过 build_backend(project_id)
+  - name: project_isolation
+    description: 业务表必须包含 Fproject_id 字段；查询/写入必须显式传入 project_id
+  - name: db_no_foreign_key
+    description: 数据库不使用外键约束，关联在应用层校验
+  - name: logical_delete
+    description: 删除采用 Fis_delete=1 逻辑删除，不物理删除（拣货/打印任务表除外）
+  - name: password_hash
+    description: 用户密码使用 codec_util.calc_sha256 加密存储
+  - name: secret_management
+    description: application.json 不入版本控制，session_secret_key、ydm_token、密码不出现在日志中
