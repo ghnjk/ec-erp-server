@@ -72,9 +72,28 @@
 - 耗时较长（数百到数千 SKU 时几分钟级别）
 - 每个 SKU 间隔 0.3 秒，防止触发 BigSeller 风控
 - 单条失败继续处理后续
+- **不修改打包体积字段**：`sku_pack_length / sku_pack_width / sku_pack_height` 由人工通过 `save_sku` 维护，本接口仅显式覆盖 `inventory / erp_sku_* / avg_sell_quantity / inventory_support_days`，体积字段保留旧值
 - 推荐用定时任务（凌晨）调用，等同 `auto_sync_tools/sync_sku_inventory.py`
 
 ## Change-Log
+
+### 2026-04-30 - 显式声明不覆盖打包体积字段
+
+**变更类型**：行为约定 + 注释强化（无功能变化）
+
+**变更原因**：配合 `t_sku_info` 新增打包体积字段，避免同步任务把人工录入的体积清零。详见 OpenSpec change `add-sku-pack-volume`。
+
+**变更内容**：
+- 在 handler 内部加注释，明确仅显式覆盖既有字段，不动 `sku_pack_*`
+- 文档与同步任务（`auto_sync_tools/sync_sku_inventory.py`）保持一致约束
+
+**前端影响**：无。
+
+**回滚方式**：注释删除即可。
+
+**关联代码改动**：
+- handler：[ec_erp_api/apis/supplier.py](../../../../../ec_erp_api/apis/supplier.py) `sync_all_sku`
+- 同步任务：[auto_sync_tools/sync_sku_inventory.py](../../../../../auto_sync_tools/sync_sku_inventory.py)
 
 ### 初始版本 - 同步所有 SKU 接口
 

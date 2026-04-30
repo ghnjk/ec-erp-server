@@ -52,6 +52,7 @@ Supplier 模块提供供应商管理、SKU 主数据管理、SKU 采购价格、
   - `sku` (string, 必填)
   - `sku_group` (string)、`sku_name` (string)、`sku_unit_name` (string)
   - `sku_unit_quantity` (int)、`avg_sell_quantity` (int)、`shipping_stock_quantity` (int)、`inventory_support_days` (int)
+  - `sku_pack_length` (int, 可选, 默认 0)、`sku_pack_width` (int, 可选, 默认 0)、`sku_pack_height` (int, 可选, 默认 0)：每个采购单位的打包尺寸（cm）
 - 业务：通过 `SkuManager` + `BigSellerClient` 查询 ERP SKU、库存，构造 `SkuDto` 后落库
 - 返回：`pack_response(DtoUtil.to_dict(s))`
 

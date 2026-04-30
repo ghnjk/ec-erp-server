@@ -60,6 +60,10 @@ def get_real_inventory(client, warehouse_id, sku_id):
 
 
 def sync_sku_inventory():
+    # 同步策略：仅显式更新 inventory / erp_sku_* / avg_sell_quantity /
+    # inventory_support_days / shipping_stock_quantity；
+    # sku_pack_length / sku_pack_width / sku_pack_height 等手工维护字段保留旧值
+    # （依赖复用既有 ORM 实例，未显式覆盖的字段不会变化）。
     config = get_app_config()
     project_id = config.get("sync_tool_project_id", "philipine")
     backend = build_backend(project_id)

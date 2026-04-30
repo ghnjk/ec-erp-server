@@ -54,6 +54,9 @@ def import_sku():
             erp_sku_info=sku_info,
             sku_unit_name="",
             sku_unit_quantity=1,
+            sku_pack_length=0,
+            sku_pack_width=0,
+            sku_pack_height=0,
             avg_sell_quantity=0,
             inventory_support_days=0,
             shipping_stock_quantity=0

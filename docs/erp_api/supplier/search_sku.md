@@ -40,6 +40,9 @@ sort数组中每个元素包含：
 | &nbsp;&nbsp;∟ sku_name | string | SKU名称 |
 | &nbsp;&nbsp;∟ sku_unit_name | string | SKU单位名称 |
 | &nbsp;&nbsp;∟ sku_unit_quantity | int | SKU单位数量 |
+| &nbsp;&nbsp;∟ sku_pack_length | int | 每个采购单位的打包长度（cm），0 = 未填写 |
+| &nbsp;&nbsp;∟ sku_pack_width | int | 每个采购单位的打包宽度（cm），0 = 未填写 |
+| &nbsp;&nbsp;∟ sku_pack_height | int | 每个采购单位的打包高度（cm），0 = 未填写 |
 | &nbsp;&nbsp;∟ inventory | int | 库存数量 |
 | &nbsp;&nbsp;∟ avg_sell_quantity | float | 平均日销量 |
 | &nbsp;&nbsp;∟ inventory_support_days | int | 库存支撑天数 |
@@ -115,6 +118,9 @@ sort数组中每个元素包含：
         "sku_name": "金色枫叶",
         "sku_unit_name": "",
         "sku_unit_quantity": 1,
+        "sku_pack_length": 30,
+        "sku_pack_width": 20,
+        "sku_pack_height": 15,
         "version": null
       }
     ],

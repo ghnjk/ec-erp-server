@@ -87,6 +87,10 @@ def save_sku():
     sku_name = request_util.get_str_param("sku_name")
     sku_unit_name = request_util.get_str_param("sku_unit_name")
     sku_unit_quantity = request_util.get_int_param("sku_unit_quantity")
+    # 打包体积字段（cm，可选，默认 0；老客户端不传时不会破坏行为）
+    sku_pack_length = request_util.get_int_param("sku_pack_length", 0)
+    sku_pack_width = request_util.get_int_param("sku_pack_width", 0)
+    sku_pack_height = request_util.get_int_param("sku_pack_height", 0)
     avg_sell_quantity = request_util.get_int_param("avg_sell_quantity")
     shipping_stock_quantity = request_util.get_int_param("shipping_stock_quantity")
     inventory_support_days = request_util.get_int_param("inventory_support_days")
@@ -114,6 +118,9 @@ def save_sku():
         erp_sku_info={},
         sku_unit_name=sku_unit_name,
         sku_unit_quantity=sku_unit_quantity,
+        sku_pack_length=sku_pack_length,
+        sku_pack_width=sku_pack_width,
+        sku_pack_height=sku_pack_height,
         avg_sell_quantity=avg_sell_quantity,
         inventory_support_days=inventory_support_days,
         shipping_stock_quantity=shipping_stock_quantity
@@ -196,6 +203,9 @@ def add_sku():
             erp_sku_info={},
             sku_unit_name=sku_unit_name,
             sku_unit_quantity=sku_unit_quantity,
+            sku_pack_length=0,
+            sku_pack_width=0,
+            sku_pack_height=0,
             avg_sell_quantity=avg_sell_quantity,
             inventory_support_days=inventory_support_days,
             shipping_stock_quantity=shipping_stock_quantity
@@ -214,6 +224,9 @@ def add_sku():
 @supplier_apis.route('/sync_all_sku', methods=["POST"])
 @api_post_request()
 def sync_all_sku():
+    # 同步策略：仅显式更新 inventory / erp_sku_* / avg_sell_quantity /
+    # inventory_support_days / shipping_stock_quantity；
+    # sku_pack_length / sku_pack_width / sku_pack_height 等手工维护字段保留旧值。
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
     backend = request_context.get_backend()
@@ -317,6 +330,9 @@ def query_sku_purchase_price():
 
 
 def build_purchase_order_from_req() -> PurchaseOrder:
+    # 注：采购单 SKU 快照仅冗余销售/采购相关字段（unit_price / sku_unit_quantity 等），
+    # 不冗余打包体积字段（sku_pack_*），按 OpenSpec change add-sku-pack-volume 设计：
+    # 体积属于 t_sku_info 主数据，使用方按需读取，避免历史快照过早绑定可变属性。
     order_type = request_util.get_int_param("order_type")
     if order_type is None or order_type not in (1, 2):
         raise Exception("order_type参数无效，必须为1(境内进货)或2(境外线下)")

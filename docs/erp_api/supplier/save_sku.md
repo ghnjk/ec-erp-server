@@ -16,6 +16,9 @@
 | sku_name | string | 是 | SKU名称 |
 | sku_unit_name | string | 是 | SKU单位名称（如：箱、个、包） |
 | sku_unit_quantity | int | 是 | SKU单位数量 |
+| sku_pack_length | int | 否 | 每个采购单位的打包长度（cm），默认 0；0 = 未填写 |
+| sku_pack_width | int | 否 | 每个采购单位的打包宽度（cm），默认 0；0 = 未填写 |
+| sku_pack_height | int | 否 | 每个采购单位的打包高度（cm），默认 0；0 = 未填写 |
 | avg_sell_quantity | int | 是 | 平均日销量 |
 | shipping_stock_quantity | int | 是 | 在途库存数量 |
 | inventory_support_days | int | 是 | 库存支撑天数 |
@@ -33,6 +36,9 @@
 | ∟ sku_name | string | SKU名称 |
 | ∟ sku_unit_name | string | SKU单位名称 |
 | ∟ sku_unit_quantity | int | SKU单位数量 |
+| ∟ sku_pack_length | int | 每个采购单位的打包长度（cm），0 = 未填写 |
+| ∟ sku_pack_width | int | 每个采购单位的打包宽度（cm），0 = 未填写 |
+| ∟ sku_pack_height | int | 每个采购单位的打包高度（cm），0 = 未填写 |
 | ∟ inventory | int | 库存数量（从BigSeller同步） |
 | ∟ avg_sell_quantity | float | 平均日销量 |
 | ∟ inventory_support_days | int | 库存支撑天数 |
@@ -59,6 +65,9 @@
   "sku_name": "金色枫叶",
   "sku_unit_name": "包",
   "sku_unit_quantity": 100,
+  "sku_pack_length": 30,
+  "sku_pack_width": 20,
+  "sku_pack_height": 15,
   "avg_sell_quantity": 20,
   "shipping_stock_quantity": 0,
   "inventory_support_days": 30
@@ -77,6 +86,9 @@
     "sku_name": "金色枫叶",
     "sku_unit_name": "包",
     "sku_unit_quantity": 100,
+    "sku_pack_length": 30,
+    "sku_pack_width": 20,
+    "sku_pack_height": 15,
     "inventory": 4725,
     "avg_sell_quantity": 20,
     "inventory_support_days": 30,
@@ -120,4 +132,5 @@
 - 库存数量会实时从BigSeller同步
 - ERP相关字段（erp_sku_id、erp_sku_name、erp_sku_image_url）会自动从BigSeller获取
 - 如果本地SKU管理器中没有该SKU，会自动从BigSeller加载全量SKU
+- 打包体积字段（sku_pack_length / sku_pack_width / sku_pack_height）单位为 cm，可选；不传时按 0 落库；**注意**：覆盖式 upsert 会把旧值覆盖为 0，前端如需保留旧体积请显式回传
 

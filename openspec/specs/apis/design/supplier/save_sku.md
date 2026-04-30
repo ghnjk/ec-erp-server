@@ -17,6 +17,9 @@
 | sku_name | string | 是 | SKU 名称 |
 | sku_unit_name | string | 是 | 单位名称（如"包"/"个"/"箱"） |
 | sku_unit_quantity | int | 是 | 单位换算数量 |
+| sku_pack_length | int | 否 | 每个采购单位的打包长度（cm），默认 0；0 = 未填写 |
+| sku_pack_width | int | 否 | 每个采购单位的打包宽度（cm），默认 0；0 = 未填写 |
+| sku_pack_height | int | 否 | 每个采购单位的打包高度（cm），默认 0；0 = 未填写 |
 | avg_sell_quantity | int | 是 | 平均日销量 |
 | shipping_stock_quantity | int | 是 | 在途库存 |
 | inventory_support_days | int | 是 | 库存支撑天数 |
@@ -45,6 +48,9 @@
     "sku_name": "金色枫叶",
     "sku_unit_name": "包",
     "sku_unit_quantity": 100,
+    "sku_pack_length": 30,
+    "sku_pack_width": 20,
+    "sku_pack_height": 15,
     "avg_sell_quantity": 20,
     "shipping_stock_quantity": 0,
     "inventory_support_days": 30
@@ -62,6 +68,9 @@
     "sku_name": "金色枫叶",
     "sku_unit_name": "包",
     "sku_unit_quantity": 100,
+    "sku_pack_length": 30,
+    "sku_pack_width": 20,
+    "sku_pack_height": 15,
     "inventory": 4725,
     "avg_sell_quantity": 20,
     "inventory_support_days": 30,
@@ -108,6 +117,27 @@
 - ERP 字段（erp_sku_id/erp_sku_name/erp_sku_image_url）自动填充
 
 ## Change-Log
+
+### 2026-04-30 - 新增打包体积字段（长 / 宽 / 高，cm）
+
+**变更类型**：新增可选请求参数 + 响应字段扩展
+
+**变更原因**：配合 `t_sku_info` 新增打包体积字段，详见 OpenSpec change `add-sku-pack-volume`。
+
+**变更内容**：
+- 请求新增 3 个 **可选** int 参数：`sku_pack_length` / `sku_pack_width` / `sku_pack_height`，默认 0
+- 响应 `data` 字段（`SkuDto.to_dict`）新增同名 3 个字段
+- 服务端通过 `request_util.get_int_param("xxx", 0)` 读取，未传 / 为 `null` / 为空字符串均按 0 处理
+
+**前端影响**：
+- 旧前端不传该字段仍可调用，落库为 0（**注意**：覆盖式 upsert 时旧值会被覆盖为 0，前端如需保留旧体积请显式回传）
+- 新前端可在 SKU 编辑表单中加入 3 个尺寸输入框（cm），并将原值连同其他字段一并回传
+
+**回滚方式**：移除 `request_util.get_int_param("sku_pack_*", 0)` 与 `SkuDto(...)` 中的 3 个参数即可。
+
+**关联代码改动**：
+- handler：[ec_erp_api/apis/supplier.py](../../../../../ec_erp_api/apis/supplier.py) `save_sku`
+- ORM：`SkuDto`
 
 ### 初始版本 - 保存 SKU 接口
 

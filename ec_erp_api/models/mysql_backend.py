@@ -164,6 +164,12 @@ class SkuDto(DtoBase):
     sku_unit_name: Mapped[str] = Column('Fsku_unit_name', String(256), default="", server_default="", comment='采购单位')
     sku_unit_quantity: Mapped[int] = Column('Fsku_unit_quantity', Integer, default=1, server_default="1",
                                             comment='每个单位的sku数')
+    sku_pack_length: Mapped[int] = Column('Fsku_pack_length', Integer, default=0, server_default="0",
+                                          comment='打包长度（cm）')
+    sku_pack_width: Mapped[int] = Column('Fsku_pack_width', Integer, default=0, server_default="0",
+                                         comment='打包宽度（cm）')
+    sku_pack_height: Mapped[int] = Column('Fsku_pack_height', Integer, default=0, server_default="0",
+                                          comment='打包高度（cm）')
     inventory: Mapped[int] = Column('Finventory', Integer, default=0, server_default="0",
                                     comment='库存量')
     avg_sell_quantity: Mapped[float] = Column('Favg_sell_quantity', Float, default=0.0, server_default="0.0",
@@ -191,6 +197,7 @@ class SkuDto(DtoBase):
         "sku_name", "inventory", "erp_sku_name", "erp_sku_image_url",
         "erp_sku_id", "erp_sku_info",
         "sku_unit_name", "sku_unit_quantity",
+        "sku_pack_length", "sku_pack_width", "sku_pack_height",
         "avg_sell_quantity", "shipping_stock_quantity", "inventory_support_days",
         "is_delete", "version",
         "modify_user", "create_time", "modify_time"

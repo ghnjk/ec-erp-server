@@ -90,9 +90,27 @@
 
 - 已存在的 SKU 不会重复添加，需要更新走 `save_sku`
 - 默认值需要后续通过 `save_sku` 完善
+- 新增的打包体积字段（`sku_pack_length / sku_pack_width / sku_pack_height`）默认 0（cm），需通过 `save_sku` 单独维护
 - 单条失败不影响其他 SKU
 
 ## Change-Log
+
+### 2026-04-30 - 默认体积字段为 0
+
+**变更类型**：写入默认值（不引入新参数）
+
+**变更原因**：配合 `t_sku_info` 新增打包体积字段，详见 OpenSpec change `add-sku-pack-volume`。
+
+**变更内容**：
+- 不修改请求参数；批量构造 `SkuDto(...)` 时显式传 `sku_pack_length=0, sku_pack_width=0, sku_pack_height=0`
+- 后续可通过 `/erp_api/supplier/save_sku` 完善体积
+
+**前端影响**：无。
+
+**回滚方式**：移除 `SkuDto(...)` 中的 3 个体积参数即可，ORM 默认值会兜底为 0。
+
+**关联代码改动**：
+- handler：[ec_erp_api/apis/supplier.py](../../../../../ec_erp_api/apis/supplier.py) `add_sku`
 
 ### 初始版本 - 批量添加 SKU 接口
 
