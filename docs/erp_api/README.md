@@ -188,18 +188,42 @@ SKU销售价格、销售订单管理接口。
 
 ## 第三方集成
 
-系统集成了以下第三方服务：
+系统集成了以下第三方服务，通过 `use_up_seller` 配置项在 BigSeller / UpSeller 之间切换。
+切换在 `ec_erp_api/common/seller_util.build_seller_client()` 工厂内完成，supplier 模块通过统一的
+`ec.seller_client.SellerClient` 抽象接口对接，业务代码不感知底层差异。
 
-### BigSeller ERP
+### BigSeller ERP（默认）
+- 适用：印度、马来西亚、菲律宾、泰国
 - SKU管理和库存同步
 - 订单查询和打印
 - 物流信息管理
 
 配置项：
+- `use_up_seller`: false
 - `big_seller_mail`: BigSeller账号
 - `big_seller_encoded_passwd`: 加密后的密码
 - `big_seller_warehouse_id`: 仓库ID
-- `big_seller_shelf_id`: 货架ID
+- `big_seller_shelf_id` / `big_seller_shelf_name`: 货架信息
+
+### UpSeller ERP（巴西项目）
+- 适用：巴西（`use_up_seller=true`）
+- 通过 `tools/up_seller_selenium_cookie.py` 人工登录后保存 cookies；首次实际登录走 selenium 模式
+- 与 BigSeller 主要差异：
+  - SKU 详情字段 `warehouseVOS`（注意大写）替代 `warehouseVoList`
+  - 库存接口 `/api/warehouse-sku/list` 不返回 `avgDailySales`，`avg_daily_sales` 由 adapter 默认置 0
+  - 入/出库走独立端点 `/api/warehouse-inout-list/add-in` 与 `/add-out`，无 shelf 概念
+
+配置项：
+- `use_up_seller`: true
+- `up_seller.mail`: UpSeller 登录邮箱
+- `up_seller.password`: UpSeller 明文密码
+- `up_seller.warehouse_id`: UpSeller 仓库 ID
+- `up_seller.chromedriver_path`: ChromeDriver 路径（selenium 登录用）
+
+### 接入新 Seller 平台
+1. 实现 `ec/seller_client.SellerClient` Protocol 的所有方法
+2. 在 `ec_erp_api/common/seller_util.py` 工厂内增加分支
+3. supplier.py 等业务代码无需改动
 
 ## 开发指南
 

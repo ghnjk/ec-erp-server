@@ -7,18 +7,15 @@
 """
 import copy
 import datetime
-import os
 import time
 from ec_erp_api.common.api_core import api_post_request
 from ec_erp_api.common import request_util, response_util, request_context
 from flask import (
     Blueprint
 )
-from ec_erp_api.app_config import get_app_config
-from ec.bigseller.big_seller_client import BigSellerClient
-from ec.sku_manager import SkuManager
+from ec_erp_api.common.seller_util import build_seller_client
+from ec.seller_client import StockMoveItem
 from ec_erp_api.models.mysql_backend import PurchaseOrder, SkuDto, SkuPurchasePriceDto, DtoUtil
-import json
 
 supplier_apis = Blueprint('supplier', __name__)
 
@@ -76,12 +73,7 @@ def search_sku():
 def save_sku():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
-    config = get_app_config()
-    cookies_dir = config.get("cookies_dir", "../cookies")
-    sm = SkuManager(local_db_path=os.path.join(cookies_dir, "all_sku.json"))
-    sm.load()
-    client = BigSellerClient(config["ydm_token"], cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))
-    client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+    seller = build_seller_client()
     sku = request_util.get_str_param("sku")
     sku_group = request_util.get_str_param("sku_group")
     sku_name = request_util.get_str_param("sku_name")
@@ -94,27 +86,18 @@ def save_sku():
     avg_sell_quantity = request_util.get_int_param("avg_sell_quantity")
     shipping_stock_quantity = request_util.get_int_param("shipping_stock_quantity")
     inventory_support_days = request_util.get_int_param("inventory_support_days")
-    sku_id = sm.get_sku_id(sku)
-    if sku_id is None:
-        sm.load_and_update_all_sku(client)
-    sku_id = sm.get_sku_id(sku)
-    if sku_id is None:
+    if seller.get_sku_id(sku) is None:
         return response_util.pack_error_response(1003, f"sku {sku} 不存在")
-    sku_info = client.query_sku_detail(
-        sku_id
-    )
-    inventory = 0
-    for vo in sku_info["warehouseVoList"]:
-        inventory += vo["available"]
+    sku_detail = seller.query_sku_detail(sku)
     s = SkuDto(
         project_id=request_context.get_current_project_id(),
         sku=sku,
         sku_group=sku_group,
         sku_name=sku_name,
-        inventory=inventory,
-        erp_sku_name=sku_info["title"],
-        erp_sku_image_url=sku_info["imgUrl"],
-        erp_sku_id=str(sku_info["id"]),
+        inventory=sku_detail.inventory_in_warehouse,
+        erp_sku_name=sku_detail.title,
+        erp_sku_image_url=sku_detail.image_url,
+        erp_sku_id=sku_detail.erp_sku_id,
         erp_sku_info={},
         sku_unit_name=sku_unit_name,
         sku_unit_quantity=sku_unit_quantity,
@@ -134,20 +117,13 @@ def save_sku():
 def add_sku():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
-    config = get_app_config()
-    cookies_dir = config.get("cookies_dir", "../cookies")
-    sm = SkuManager(local_db_path=os.path.join(cookies_dir, "all_sku.json"))
-    sm.load()
-    client = BigSellerClient(config["ydm_token"], cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))
-    client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+    seller = build_seller_client()
     skus = request_util.get_str_param("skus").strip()
     backend = request_context.get_backend()
-    has_load_all_sku = False
     op_detail = {}
     success_count = 0
     ignore_count = 0
     fail_count = 0
-    warehouse_id = config["big_seller_warehouse_id"]
     for line in skus.split("\n"):
         line = line.strip()
         if len(line) <= 0:
@@ -163,30 +139,19 @@ def add_sku():
         sku_unit_name = ""
         sku_unit_quantity = 1
         shipping_stock_quantity = 0
-        sku_id = sm.get_sku_id(sku)
-        if sku_id is None and not has_load_all_sku:
-            sm.load_and_update_all_sku(client)
-            has_load_all_sku = True
-        sku_id = sm.get_sku_id(sku)
-        if sku_id is None:
+        if seller.get_sku_id(sku) is None:
             op_detail[sku] = f"sku {sku} 不存在"
             fail_count += 1
             continue
-        sku_info = client.query_sku_detail(
-            sku_id
-        )
-        inventory = 0
-        for vo in sku_info["warehouseVoList"]:
-            if vo["id"] != warehouse_id:
-                continue
-            inventory += vo["available"]
+        sku_detail = seller.query_sku_detail(sku)
+        inv_detail = seller.query_sku_inventory_detail(sku)
         # 计算平均销售sku数量
-        detail = client.query_sku_inventory_detail(sku, warehouse_id)
-        if detail["avgDailySales"] is None:
+        if inv_detail.avg_daily_sales <= 0:
             avg_sell_quantity = 0
         else:
-            avg_sell_quantity = round(detail["avgDailySales"] * 1.1, 2)
+            avg_sell_quantity = round(inv_detail.avg_daily_sales * 1.1, 2)
         # 计算库存支撑天数
+        inventory = sku_detail.inventory_in_warehouse
         if avg_sell_quantity > 0.01:
             inventory_support_days = int(inventory / avg_sell_quantity)
         else:
@@ -197,9 +162,9 @@ def add_sku():
             sku_group=sku_group,
             sku_name=sku_name,
             inventory=inventory,
-            erp_sku_name=sku_info["title"],
-            erp_sku_image_url=sku_info["imgUrl"],
-            erp_sku_id=str(sku_info["id"]),
+            erp_sku_name=sku_detail.title,
+            erp_sku_image_url=sku_detail.image_url,
+            erp_sku_id=sku_detail.erp_sku_id,
             erp_sku_info={},
             sku_unit_name=sku_unit_name,
             sku_unit_quantity=sku_unit_quantity,
@@ -231,41 +196,22 @@ def sync_all_sku():
         return response_util.pack_error_response(1008, "权限不足")
     backend = request_context.get_backend()
     _, sku_list = backend.search_sku(sku_group=None, sku_name=None, sku=None, offset=0, limit=10000)
-    config = get_app_config()
-    cookies_dir = config.get("cookies_dir", "../cookies")
-    sm = SkuManager(local_db_path=os.path.join(cookies_dir, "all_sku.json"))
-    sm.load()
-    client = BigSellerClient(config["ydm_token"], cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))
-    client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+    seller = build_seller_client()
     update_count = 0
-    warehouse_id = config["big_seller_warehouse_id"]
     fail_count = 0
-    has_load_all_sku = False
     for item in sku_list:
-        sku_id = sm.get_sku_id(item.sku)
-        if sku_id is None and not has_load_all_sku:
-            sm.load_and_update_all_sku(client)
-            has_load_all_sku = True
-        sku_id = sm.get_sku_id(item.sku)
-        if sku_id is None:
+        if seller.get_sku_id(item.sku) is None:
             print(f"cannot found sku {item.sku} in sku manager.")
             fail_count += 1
             continue
-        detail = client.query_sku_inventory_detail(item.sku, warehouse_id)
-        sku_info = client.query_sku_detail(
-            sku_id
-        )
-        inventory = 0
-        for vo in sku_info["warehouseVoList"]:
-            if vo["id"] != warehouse_id:
-                continue
-            inventory += vo["available"]
-        item.inventory = inventory
-        item.erp_sku_name = sku_info["title"]
-        item.erp_sku_image_url = sku_info["imgUrl"]
-        item.erp_sku_id = str(sku_info["id"])
+        sku_detail = seller.query_sku_detail(item.sku)
+        inv_detail = seller.query_sku_inventory_detail(item.sku)
+        item.inventory = sku_detail.inventory_in_warehouse
+        item.erp_sku_name = sku_detail.title
+        item.erp_sku_image_url = sku_detail.image_url
+        item.erp_sku_id = sku_detail.erp_sku_id
         # 计算平均销售sku数量
-        item.avg_sell_quantity = round(detail["avgDailySales"] * 1.1, 2)
+        item.avg_sell_quantity = round(inv_detail.avg_daily_sales * 1.1, 2)
         # 计算库存支撑天数
         if item.avg_sell_quantity > 0.01:
             item.inventory_support_days = int(item.inventory / item.avg_sell_quantity)
@@ -457,99 +403,60 @@ def save_purchase_price(order: PurchaseOrder):
         request_context.get_backend().store_sku_purchase_price(price)
 
 
-def sync_stock_to_erp(order: PurchaseOrder):
-    config = get_app_config()
-    cookies_dir = config.get("cookies_dir", "../cookies")
-    client = BigSellerClient(config["ydm_token"], cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))
-    client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
-    sync_id = f"IN-EC-{order.purchase_order_id}"
-    stock_list = []
-    for item in order.store_skus:
-        sku = item["sku"]
-        print(f"sync_stock_to_erp add sku {sku}")
+def _build_stock_move_items(order: PurchaseOrder, with_price: bool):
+    items = []
+    for entry in order.store_skus:
+        sku = entry["sku"]
         sku_info = request_context.get_backend().get_sku(sku)
-        stock_list.append({
-            "skuId": int(sku_info.erp_sku_id),
-            "stockPrice": item["unit_price"] / 100.0,
-            "shelfList": [
-                {
-                    "shelfId": config["big_seller_shelf_id"],
-                    "shelfName": config["big_seller_shelf_name"],
-                    "stockQty": item["check_in_quantity"] * item["sku_unit_quantity"]
-                }
-            ]
-        })
-    req = {
-        "detailsAddBoList": stock_list,
-        "id": "",
-        "inoutTypeId": "1001",
-        "isAutoInoutStock": 1,
-        "note": f"ec-erp 采购单：{order.purchase_order_id} [入库单={sync_id}]",
-        "warehouseId": config["big_seller_warehouse_id"],
-        "zoneId": None
-    }
-    print("sync_stock_to_erp req: ", json.dumps(req))
-    res = client.add_stock_to_erp(req)
-    print("sync_stock_to_erp res: ", json.dumps(res))
-    success = res["successNum"]
-    fail = res["failNum"]
-    print(f"导入erp仓库： 成功： {success} 异常：  {fail}")
-    if fail > 0:
-        return response_util.pack_error_response(1004, f"导入erp仓库： 成功： {success} 异常：  {fail}")
-    else:
-        return response_util.pack_response(res)
+        if sku_info is None:
+            raise Exception(f"SKU {sku} 未找到")
+        if not sku_info.erp_sku_id:
+            raise Exception(f"SKU {sku} 没有关联的ERP SKU ID")
+        items.append(StockMoveItem(
+            erp_sku_id=str(sku_info.erp_sku_id),
+            sku=sku,
+            quantity=int(entry["check_in_quantity"]) * int(entry["sku_unit_quantity"]),
+            unit_price_yuan=(entry["unit_price"] / 100.0) if with_price else None,
+        ))
+    return items
+
+
+def sync_stock_to_erp(order: PurchaseOrder):
+    seller = build_seller_client()
+    sync_id = f"IN-EC-{order.purchase_order_id}"
+    items = _build_stock_move_items(order, with_price=True)
+    note = f"ec-erp 采购单：{order.purchase_order_id} [入库单={sync_id}]"
+    for it in items:
+        print(f"sync_stock_to_erp add sku {it.sku}")
+    res = seller.add_stock_in(items, note)
+    print(f"导入erp仓库： 成功： {res.success} 异常：  {res.fail}")
+    if res.fail > 0:
+        return response_util.pack_error_response(
+            1004, f"导入erp仓库： 成功： {res.success} 异常：  {res.fail}")
+    return response_util.pack_response(res.raw)
 
 
 def sync_stock_out_to_erp(order: PurchaseOrder):
     """
-    境外线下采购单同步ERP出库（inoutTypeId=1002）
+    境外线下采购单同步ERP出库（BigSeller inoutTypeId=1002 / UpSeller add-out 接口）
     """
-    config = get_app_config()
-    cookies_dir = config.get("cookies_dir", "../cookies")
-    client = BigSellerClient(config["ydm_token"], cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))
-    client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+    seller = build_seller_client()
     sync_id = f"OUT-EC-PO-{order.purchase_order_id}"
-    stock_list = []
-    for item in order.store_skus:
-        sku = item["sku"]
-        print(f"sync_stock_out_to_erp add sku {sku}")
-        sku_info = request_context.get_backend().get_sku(sku)
-        if sku_info is None:
-            return response_util.pack_error_response(1004, f"SKU {sku} 未找到")
-        if not sku_info.erp_sku_id:
-            return response_util.pack_error_response(1004, f"SKU {sku} 没有关联的ERP SKU ID")
-        stock_list.append({
-            "skuId": int(sku_info.erp_sku_id),
-            "stockPrice": None,
-            "shelfList": [
-                {
-                    "shelfId": config["big_seller_shelf_id"],
-                    "shelfName": config["big_seller_shelf_name"],
-                    "stockQty": item["check_in_quantity"] * item["sku_unit_quantity"]
-                }
-            ]
-        })
-    if len(stock_list) == 0:
+    try:
+        items = _build_stock_move_items(order, with_price=False)
+    except Exception as e:
+        return response_util.pack_error_response(1004, str(e))
+    if len(items) == 0:
         return response_util.pack_error_response(1004, "没有有效的SKU需要出库")
-    req = {
-        "detailsAddBoList": stock_list,
-        "id": "",
-        "inoutTypeId": "1002",
-        "isAutoInoutStock": 1,
-        "note": f"ec-erp 境外线下销售单：{order.purchase_order_id} [出库单={sync_id}]",
-        "warehouseId": config["big_seller_warehouse_id"],
-        "zoneId": None
-    }
-    print("sync_stock_out_to_erp req: ", json.dumps(req))
-    res = client.add_stock_to_erp(req)
-    print("sync_stock_out_to_erp res: ", json.dumps(res))
-    success = res["successNum"]
-    fail = res["failNum"]
-    print(f"境外采购出库ERP： 成功： {success} 失败： {fail}")
-    if fail > 0:
-        return response_util.pack_error_response(1004, f"境外采购出库ERP： 成功： {success} 失败： {fail}")
-    else:
-        return response_util.pack_response(res)
+    note = f"ec-erp 境外线下销售单：{order.purchase_order_id} [出库单={sync_id}]"
+    for it in items:
+        print(f"sync_stock_out_to_erp add sku {it.sku}")
+    res = seller.add_stock_out(items, note)
+    print(f"境外采购出库ERP： 成功： {res.success} 失败： {res.fail}")
+    if res.fail > 0:
+        return response_util.pack_error_response(
+            1004, f"境外采购出库ERP： 成功： {res.success} 失败： {res.fail}")
+    return response_util.pack_response(res.raw)
 
 
 @supplier_apis.route('/submit_purchase_order_and_next_step', methods=["POST"])
