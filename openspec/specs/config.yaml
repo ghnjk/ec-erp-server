@@ -32,11 +32,11 @@ specs:
   - id: system_module
     title: System 模块规约（系统/登录）
     file: system_module_spec.md
-    summary: 用户认证与登录，提供 Token 登录、账号密码登录、用户信息查询。
+    summary: 用户认证与登录，提供 Token 登录、账号密码登录、用户信息查询、后端 ERP 登录状态查询。
     blueprint: system_apis
     url_prefix: /erp_api/system
     permission: 无需权限校验（仅登录态）
-    routes_count: 3
+    routes_count: 4
     key_files:
       - ec_erp_api/apis/system.py
 
@@ -242,9 +242,9 @@ loggers:
 
 apis:
   spec: apis/spec.md
-  total_count: 27
+  total_count: 28
   by_module:
-    system: 3
+    system: 4
     supplier: 10
     warehouse: 7
     sale: 7
@@ -259,6 +259,9 @@ apis:
       - path: /erp_api/system/get_login_user_info
         design: apis/design/system/get_login_user_info.md
         handler: ec_erp_api/apis/system.py:get_login_user_info
+      - path: /erp_api/system/get_backend_erp_status
+        design: apis/design/system/get_backend_erp_status.md
+        handler: ec_erp_api/apis/system.py:get_backend_erp_status
     supplier:
       - path: /erp_api/supplier/search_supplier
         design: apis/design/supplier/search_supplier.md

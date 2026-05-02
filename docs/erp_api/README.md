@@ -51,6 +51,7 @@
 | [通过Token登录](./system/login_user_with_token.md) | `/erp_api/system/login_user_with_token` | 通过Base64编码的token进行登录 |
 | [用户登录](./system/login_user.md) | `/erp_api/system/login_user` | 用户名密码登录 |
 | [获取登录用户信息](./system/get_login_user_info.md) | `/erp_api/system/get_login_user_info` | 获取当前登录用户信息 |
+| [获取后端ERP登录状态](./system/get_backend_erp_status.md) | `/erp_api/system/get_backend_erp_status` | 获取后端 seller ERP 类型、邮箱、仓库ID和登录态 |
 
 ### Supplier 模块（供应商管理）
 

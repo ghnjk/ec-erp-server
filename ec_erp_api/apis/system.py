@@ -12,6 +12,7 @@ from flask import (
 )
 from ec_erp_api.common import codec_util
 from ec_erp_api.common.api_core import api_post_request
+from ec_erp_api.common.seller_util import query_seller_status
 
 system_apis = Blueprint('system', __name__)
 
@@ -74,3 +75,11 @@ def _get_login_user_info():
 @api_post_request()
 def get_login_user_info():
     return _get_login_user_info()
+
+
+@system_apis.route("/get_backend_erp_status", methods=["POST"])
+@api_post_request()
+def get_backend_erp_status():
+    if request_context.get_current_user() is None:
+        return response_util.pack_error_json_response(1001, "not login.")
+    return response_util.pack_json_response(query_seller_status())

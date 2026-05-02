@@ -14,6 +14,8 @@ BigSellerAdapter / UpSellerAdapter。
 - 仅替换"构造 + 登录"路径，cookie 持久化仍由各自 client 的 save/load_cookies 负责；
 - 不破坏 big_seller_util.build_big_seller_client：warehouse.py / sale.py 等老路径继续可用。
 """
+import contextlib
+import io
 import os
 import time
 
@@ -41,6 +43,78 @@ def get_seller_warehouse_id() -> int:
     if _is_up_seller_enabled():
         return int(config["up_seller"]["warehouse_id"])
     return int(config["big_seller_warehouse_id"])
+
+
+def _build_seller_status_base(config: dict) -> dict:
+    if _is_up_seller_enabled():
+        up_cfg = config["up_seller"]
+        return {
+            "erp_type": "up_seller",
+            "email": up_cfg.get("mail", ""),
+            "warehouse_id": str(up_cfg.get("warehouse_id", "")),
+            "is_login": False,
+            "auto_login": False,
+            "message": "",
+        }
+    return {
+        "erp_type": "big_seller",
+        "email": config.get("big_seller_mail", ""),
+        "warehouse_id": str(config.get("big_seller_warehouse_id", "")),
+        "is_login": False,
+        "auto_login": True,
+        "message": "",
+    }
+
+
+def _format_status_error(e: Exception) -> str:
+    msg = str(e)
+    if len(msg) > 256:
+        msg = msg[:256] + "..."
+    return msg
+
+
+def query_seller_status() -> dict:
+    """查询后端 ERP 登录状态。
+
+    BigSeller 路径允许触发自动登录；UpSeller 只加载 cookie 并检查登录态，
+    绝不调用 ``UpSellerClient.login``，避免只读状态接口触发 selenium/验证码流程。
+    """
+    config = get_app_config()
+    status = _build_seller_status_base(config)
+    cookies_dir = config.get("cookies_dir", "../cookies")
+
+    if _is_up_seller_enabled():
+        client = UpSellerClient(
+            config["ydm_token"],
+            cookies_file_path=os.path.join(cookies_dir, "up_seller.cookies"),
+            login_mode="api",
+        )
+        try:
+            if not client.load_cookies():
+                status["message"] = "up_seller cookie 文件不存在或不可读取"
+                return status
+            status["is_login"] = bool(client.is_login())
+            status["message"] = "up_seller cookie login ok" if status["is_login"] else "up_seller cookie 已失效"
+        except Exception as e:
+            status["is_login"] = False
+            status["message"] = _format_status_error(e)
+        return status
+
+    client = BigSellerClient(
+        config["ydm_token"],
+        cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"),
+    )
+    try:
+        # BigSellerClient/YdmVerify 会向 stdout 打印验证码请求细节；状态接口只需要
+        # 结构化结果，避免把 token/captcha 等中间信息写入服务日志。
+        with contextlib.redirect_stdout(io.StringIO()):
+            client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+            status["is_login"] = bool(client.is_login())
+        status["message"] = "big_seller login ok" if status["is_login"] else "big_seller login failed"
+    except Exception as e:
+        status["is_login"] = False
+        status["message"] = _format_status_error(e)
+    return status
 
 
 def _build_big_seller_adapter() -> BigSellerAdapter:
