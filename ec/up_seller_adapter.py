@@ -153,6 +153,9 @@ class UpSellerAdapter(SellerClient):
         raw = self._client.out_stock_from_erp(payload)
         return self._extract_stock_result(raw, total=len(items))
 
+    def refresh_local_sku_cache(self) -> None:
+        self._sku_manager.load_and_update_all_sku(self._client)
+
     @staticmethod
     def _extract_stock_result(raw, total: int) -> StockResult:
         # UpSeller 接口返回字段尚未在探测中确认，做最大兼容：

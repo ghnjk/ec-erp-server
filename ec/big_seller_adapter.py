@@ -140,3 +140,6 @@ class BigSellerAdapter(SellerClient):
 
     def add_stock_out(self, items: List[StockMoveItem], note: str) -> StockResult:
         return self._do_inout(items, note, "1002")
+
+    def refresh_local_sku_cache(self) -> None:
+        self._sku_manager.load_and_update_all_sku(self._client)

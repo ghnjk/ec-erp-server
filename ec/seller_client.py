@@ -80,3 +80,15 @@ class SellerClient(Protocol):
 
     def add_stock_out(self, items: List[StockMoveItem], note: str) -> StockResult:
         ...
+
+    def refresh_local_sku_cache(self) -> None:
+        """从上游 ERP 全量拉取 SKU 列表并写入本地缓存。
+
+        - BigSeller 实现 → ``cookies/all_sku.json`` + ``cookies/all_variant_sku_mapping.json``
+        - UpSeller 实现 → ``cookies/all_up_seller_sku.json``
+
+        与 ``auto_sync_tools/sync_all_sku.py`` 配合使用：定时任务通过本方法
+        刷新本地 SKU 缓存，无需在脚本中区分上游平台。如果上游接口失败，
+        实现应抛异常而不是静默忽略。
+        """
+        ...
