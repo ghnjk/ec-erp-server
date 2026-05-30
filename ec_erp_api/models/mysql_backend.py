@@ -674,9 +674,40 @@ class MysqlBackend(object):
                          f"  failed: {e}")
             raise
 
+    def get_supplier_by_name(self, supplier_name: str) -> typing.Optional[SupplierDto]:
+        session = self.DBSession()
+        try:
+            return session.query(SupplierDto).filter(
+                SupplierDto.project_id == self.project_id).filter(
+                SupplierDto.supplier_name == supplier_name).filter(
+                SupplierDto.is_delete == 0).first()
+        finally:
+            session.close()
+
+    def delete_supplier(self, supplier_id: int):
+        """
+        逻辑删除供应商
+        """
+        session = self.DBSession()
+        try:
+            db_dto = self._get_supplier(session, supplier_id)
+            if db_dto is None:
+                raise Exception(f"供应商不存在: {supplier_id}")
+            db_dto.is_delete = 1
+            db_dto.modify_time = datetime.now()
+            session.add(db_dto)
+            session.commit()
+            session.close()
+        except Exception as e:
+            session.rollback()
+            session.close()
+            logger.error(f"delete supplier {supplier_id} failed: {e}")
+            raise
+
     def search_suppliers(self, offset: int, limit: int) -> typing.Tuple[int, typing.List[SupplierDto]]:
         session = self.DBSession()
-        q = session.query(SupplierDto).filter(SupplierDto.project_id == self.project_id).order_by(
+        q = session.query(SupplierDto).filter(SupplierDto.project_id == self.project_id).filter(
+            SupplierDto.is_delete == 0).order_by(
             SupplierDto.supplier_id.asc())
         total = q.count()
         q = q.offset(offset).limit(limit)

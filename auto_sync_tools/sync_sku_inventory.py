@@ -4,6 +4,13 @@
 @file: sync_sku_inventory
 @author: jkguo
 @create: 2024/3/8
+
+同步策略：仅显式更新 inventory / erp_sku_* / inventory_support_days / shipping_stock_quantity；
+当上游 ERP 提供 avg_daily_sales > 0 时同步 avg_sell_quantity；为 0（典型 UpSeller 路径，
+或 BigSeller 真无销量）则保留数据库已有值，不破坏运营人工维护的均量。
+sku_pack_length / sku_pack_width / sku_pack_height 等手工维护字段保留旧值
+（依赖复用既有 ORM 实例，未显式覆盖的字段不会变化）。
+ERP 类型由 application.json:use_up_seller 决定，由 seller_util.build_seller_client() 统一路由。
 """
 import time
 import datetime
@@ -12,7 +19,8 @@ import typing
 
 sys.path.append("..")
 from ec_erp_api.app_config import get_app_config
-from ec_erp_api.common.big_seller_util import build_big_seller_client, build_backend, MysqlBackend
+from ec_erp_api.common.big_seller_util import build_backend, MysqlBackend
+from ec_erp_api.common.seller_util import build_seller_client
 
 
 def load_and_calc_sku_avg_sell_quantity(backend, sku: str) -> float:
@@ -47,48 +55,33 @@ def load_all_shipping_sku_info(backend: MysqlBackend):
     return shipping_sku_map
 
 
-def get_real_inventory(client, warehouse_id, sku_id):
-    sku_info = client.query_sku_detail(
-        sku_id
-    )
-    inventory = 0
-    for vo in sku_info["warehouseVoList"]:
-        if vo["id"] != warehouse_id:
-            continue
-        inventory += vo["available"]
-    return inventory
-
-
 def sync_sku_inventory():
-    # 同步策略：仅显式更新 inventory / erp_sku_* / avg_sell_quantity /
-    # inventory_support_days / shipping_stock_quantity；
-    # sku_pack_length / sku_pack_width / sku_pack_height 等手工维护字段保留旧值
-    # （依赖复用既有 ORM 实例，未显式覆盖的字段不会变化）。
     config = get_app_config()
     project_id = config.get("sync_tool_project_id", "philipine")
     backend = build_backend(project_id)
-    client = build_big_seller_client()
-    warehouse_id = config["big_seller_warehouse_id"]
+    seller = build_seller_client()
     shipping_sku_map = load_all_shipping_sku_info(backend)
     _, sku_list = backend.search_sku(sku_group=None, sku_name=None, sku=None, offset=0, limit=10000)
     for sku_info in sku_list:
-        detail = client.query_sku_inventory_detail(sku_info.sku, warehouse_id)
-        if detail is None:
-            print(f"{sku_info.sku} query_sku_inventory_detail return None.")
+        try:
+            sku_detail = seller.query_sku_detail(sku_info.sku)
+            inv_detail = seller.query_sku_inventory_detail(sku_info.sku)
+            sku_info.inventory = sku_detail.inventory_in_warehouse
+            sku_info.erp_sku_id = sku_detail.erp_sku_id
+            sku_info.erp_sku_name = sku_detail.title or inv_detail.title
+            sku_info.erp_sku_image_url = sku_detail.image_url or inv_detail.image_url
+            # avg_daily_sales > 0 时按上游均量刷新；为 0 则保留 DB 历史值（UpSeller 当前不暴露该字段）
+            if inv_detail.avg_daily_sales > 0:
+                sku_info.avg_sell_quantity = round(inv_detail.avg_daily_sales * 1.1, 2)
+            if sku_info.avg_sell_quantity and sku_info.avg_sell_quantity > 0.01:
+                sku_info.inventory_support_days = int(sku_info.inventory / sku_info.avg_sell_quantity)
+            else:
+                sku_info.inventory_support_days = sku_info.inventory / 0.01
+            sku_info.shipping_stock_quantity = shipping_sku_map.get(sku_info.sku, 0)
+            backend.store_sku(sku_info)
+        except Exception as e:
+            print(f"sync sku {sku_info.sku} fail: {e}")
             continue
-        inventory = get_real_inventory(client, warehouse_id, sku_info.erp_sku_id)
-        sku_info.inventory = inventory
-        sku_info.erp_sku_name = detail["title"]
-        sku_info.erp_sku_image_url = detail["image"]
-        # 计算平均销售sku数量
-        sku_info.avg_sell_quantity = round(detail["avgDailySales"] * 1.1, 2)
-        # 计算库存支撑天数
-        if sku_info.avg_sell_quantity > 0.01:
-            sku_info.inventory_support_days = int(sku_info.inventory / sku_info.avg_sell_quantity)
-        else:
-            sku_info.inventory_support_days = sku_info.inventory / 0.01
-        sku_info.shipping_stock_quantity = shipping_sku_map.get(sku_info.sku, 0)
-        backend.store_sku(sku_info)
         time.sleep(0.3)
 
 

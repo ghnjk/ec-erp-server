@@ -1,0 +1,18 @@
+---
+description: API 调用、请求包装与 Mock 数据约定
+globs: src/apis/**/*.ts,src/utils/request.ts,mock/api/data/**/*.json
+alwaysApply: false
+---
+
+# API Requests
+
+- 所有后端调用统一使用 `src/utils/request.ts` 导出的 axios 实例，不要在业务页面里直接创建 axios。
+- 所有后端 API 接口都必须先在 `src/apis/` 下按模块封装，例如 `src/apis/sysApis.ts`、`src/apis/supplierApis.ts`；页面、组件、store 不直接写后端 URL。
+- API DTO 放在 `src/apis/dto/`；新增接口时同步补充请求和返回类型。
+- POST 请求会由拦截器包装为 `{ timestamp, serviceName, apiUrl, traceId, body }`，调用方只传业务 body。
+- 响应拦截器成功时直接返回 `data.data`，API 函数的泛型应描述实际业务数据，而不是外层响应壳。
+- ERP 后端接口路径使用 `/erp_api/{module}/{api}`，保持与服务端文档和 mock 路径一致。
+- 所有 API 都需要支持本地 mock：在 `mock/api/{module}.ts` 的 `apiList` 注册相同 `url` 和 `method`，并确保 `mock/index.ts` 汇总该模块。
+- Mock 响应 JSON 放在 `mock/api/data/` 下，路径必须与真实 API URL 对齐，例如 `/erp_api/system/get_login_user_info` 对应 `mock/api/data/erp_api/system/get_login_user_info.json`。
+- Mock 使用 `MockUtil.buildMockCases()` 从 URL 自动加载 JSON，因此新增接口时必须同时补齐模块注册和 JSON 文件。
+- 错误提示优先依赖统一拦截器；页面只处理业务级确认、重试、空状态和必要的上下文提示。

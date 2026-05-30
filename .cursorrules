@@ -62,6 +62,13 @@
   - `application.json`: 应用配置（不在版本控制中）
   - `application_template.json`: 配置模板
   - `release_conf/`: 各国家配置
+- `erp_static/`: 前端子项目源码（Vue 3 + TypeScript + Vite）
+  - `src/apis/`: 后端接口封装
+  - `src/pages/`: 业务页面（supply/warehouse/sales 等）
+  - `src/router/`: 前端路由
+  - `src/store/`: Pinia 状态管理
+  - `src/layouts/`: 布局组件
+  - `mock/`: 本地 mock 服务数据与接口注册
 - `static/`: 前端静态资源
 - `data/pdf/`: PDF文件存储
 
@@ -258,9 +265,20 @@ python ec_erp_app.py
 - 测试数据库与生产数据库分离
 
 ## 前端集成
-- 前端静态资源在 `static/` 目录
+- 前端源码在 `erp_static/` 目录，构建产物用于后端静态资源集成
 - API接口统一前缀 `/erp_api/`
 - 支持通过token登录: `/erp_api/system/login_user_with_token`
+- 技术栈：Vue 3.2、TypeScript 4.8、Vite 2、Pinia、Vue Router、TDesign Vue Next、Less
+- 前端启动：
+```bash
+cd erp_static
+npm run dev
+npm run dev:mock
+```
+- `npm run dev:mock` 使用 `vite-plugin-mock`，mock 入口为 `erp_static/mock/index.ts`
+- 前端 API 必须统一封装在 `erp_static/src/apis/`，页面和组件不直接拼接后端 URL
+- 后台新增、删除或改动 `/erp_api/*` 接口时，必须同步调整 `erp_static/src/apis/` 和 `erp_static/mock/`，确保本地 `npm run dev:mock` 可用
+- mock 注册在 `erp_static/mock/api/{module}.ts` 的 `apiList` 中，响应 JSON 放在 `erp_static/mock/api/data/` 下，文件路径需与真实 API URL 对齐，例如 `/erp_api/system/get_login_user_info` 对应 `erp_static/mock/api/data/erp_api/system/get_login_user_info.json`
 
 ## 注意事项
 1. 所有涉及金额的计算使用浮点数小心处理精度
@@ -439,6 +457,8 @@ cat docs/erp_api/supplier/search_sku.md
 - [ ] 权限：验证用户权限
 - [ ] 参数：使用 `request_util` 获取
 - [ ] 响应：使用 `response_util` 返回
+- [ ] 前端：如接口被前端使用，同步更新 `erp_static/src/apis/` 的接口封装
+- [ ] Mock：新增/改动/删除接口时，同步更新 `erp_static/mock/api/{module}.ts` 和 `erp_static/mock/api/data/`，保证 `npm run dev:mock` 可用
 - [ ] 文档：创建接口Markdown文档
 - [ ] 示例：提供请求和响应示例
 - [ ] 索引：更新 `docs/erp_api/README.md`

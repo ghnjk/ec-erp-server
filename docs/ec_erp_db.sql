@@ -8,12 +8,12 @@
 -- ========================================
 CREATE TABLE IF NOT EXISTS `t_project_info` (
   `Fproject_id` VARCHAR(128) NOT NULL COMMENT '项目ID',
-  `Fdoc` JSON COMMENT '项目配置，对应ProjectConfig类',
+  `Fdoc` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '项目配置，对应ProjectConfig类',
   `Fis_delete` INT NOT NULL DEFAULT 0 COMMENT '是否逻辑删除, 1: 删除',
   `Fversion` INT NOT NULL DEFAULT 0 COMMENT '记录版本号',
   `Fmodify_user` VARCHAR(128) NOT NULL DEFAULT '' COMMENT '修改用户',
-  `Fcreate_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `Fmodify_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+  `Fcreate_time` DATETIME DEFAULT NULL COMMENT '创建时间',
+  `Fmodify_time` DATETIME DEFAULT NULL COMMENT '修改时间',
   PRIMARY KEY (`Fproject_id`),
   KEY `idx_create_time` (`Fcreate_time`),
   KEY `idx_modify_time` (`Fmodify_time`)
@@ -26,13 +26,13 @@ CREATE TABLE IF NOT EXISTS `t_user_info` (
   `Fuser_name` VARCHAR(128) NOT NULL COMMENT '用户名',
   `Fdefault_project_id` VARCHAR(128) COMMENT '默认项目',
   `Fpassword` VARCHAR(256) COMMENT '用户密码',
-  `Froles` JSON COMMENT '用户角色列表',
+  `Froles` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '用户角色列表',
   `Fis_admin` INT NOT NULL DEFAULT 0 COMMENT '是否管理员, 1: 管理员',
   `Fis_delete` INT NOT NULL DEFAULT 0 COMMENT '是否逻辑删除, 1: 删除',
   `Fversion` INT NOT NULL DEFAULT 0 COMMENT '记录版本号',
   `Fmodify_user` VARCHAR(128) NOT NULL DEFAULT '' COMMENT '修改用户',
-  `Fcreate_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `Fmodify_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+  `Fcreate_time` DATETIME DEFAULT NULL COMMENT '创建时间',
+  `Fmodify_time` DATETIME DEFAULT NULL COMMENT '修改时间',
   PRIMARY KEY (`Fuser_name`),
   KEY `idx_create_time` (`Fcreate_time`),
   KEY `idx_modify_time` (`Fmodify_time`)
@@ -50,8 +50,8 @@ CREATE TABLE IF NOT EXISTS `t_supplier_info` (
   `Fis_delete` INT NOT NULL DEFAULT 0 COMMENT '是否逻辑删除, 1: 删除',
   `Fversion` INT NOT NULL DEFAULT 0 COMMENT '记录版本号',
   `Fmodify_user` VARCHAR(128) NOT NULL DEFAULT '' COMMENT '修改用户',
-  `Fcreate_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `Fmodify_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+  `Fcreate_time` DATETIME DEFAULT NULL COMMENT '创建时间',
+  `Fmodify_time` DATETIME DEFAULT NULL COMMENT '修改时间',
   PRIMARY KEY (`Fsupplier_id`),
   KEY `idx_project_id` (`Fproject_id`),
   KEY `idx_supplier_name` (`Fsupplier_name`),
@@ -79,12 +79,12 @@ CREATE TABLE IF NOT EXISTS `t_sku_info` (
   `Ferp_sku_name` VARCHAR(1024) COMMENT 'ERP商品名称',
   `Ferp_sku_image_url` VARCHAR(10240) COMMENT '商品图片链接',
   `Ferp_sku_id` VARCHAR(256) COMMENT 'erp上sku id',
-  `Ferp_sku_info` JSON COMMENT 'erp上商品扩展信息',
+  `Ferp_sku_info` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT 'erp上商品扩展信息',
   `Fis_delete` INT NOT NULL DEFAULT 0 COMMENT '是否逻辑删除, 1: 删除',
   `Fversion` INT NOT NULL DEFAULT 0 COMMENT '记录版本号',
   `Fmodify_user` VARCHAR(128) NOT NULL DEFAULT '' COMMENT '修改用户',
-  `Fcreate_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `Fmodify_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+  `Fcreate_time` DATETIME DEFAULT NULL COMMENT '创建时间',
+  `Fmodify_time` DATETIME DEFAULT NULL COMMENT '修改时间',
   PRIMARY KEY (`Fproject_id`, `Fsku`),
   KEY `idx_sku_group` (`Fsku_group`),
   KEY `idx_sku_name` (`Fsku_name`(255)),
@@ -108,8 +108,8 @@ CREATE TABLE IF NOT EXISTS `t_sku_purchase_price` (
   `Fis_delete` INT NOT NULL DEFAULT 0 COMMENT '是否逻辑删除, 1: 删除',
   `Fversion` INT NOT NULL DEFAULT 0 COMMENT '记录版本号',
   `Fmodify_user` VARCHAR(128) NOT NULL DEFAULT '' COMMENT '修改用户',
-  `Fcreate_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `Fmodify_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+  `Fcreate_time` DATETIME DEFAULT NULL COMMENT '创建时间',
+  `Fmodify_time` DATETIME DEFAULT NULL COMMENT '修改时间',
   PRIMARY KEY (`Fproject_id`, `Fsku`, `Fsupplier_id`),
   KEY `idx_supplier_name` (`Fsupplier_name`),
   KEY `idx_sku_group` (`Fsku_group`),
@@ -139,14 +139,14 @@ CREATE TABLE IF NOT EXISTS `t_purchase_order` (
   `Fshipping_fee` VARCHAR(128) COMMENT '海运费',
   `Farrive_warehouse_date` VARCHAR(128) COMMENT '入库日期',
   `Fremark` VARCHAR(10240) NOT NULL DEFAULT '' COMMENT '备注',
-  `Fpurchase_skus` JSON COMMENT '采购的货品',
-  `Fstore_skus` JSON COMMENT '入库的货品',
-  `op_log` JSON COMMENT '操作记录',
+  `Fpurchase_skus` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '采购的货品',
+  `Fstore_skus` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '入库的货品',
+  `op_log` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '操作记录',
   `Fis_delete` INT NOT NULL DEFAULT 0 COMMENT '是否逻辑删除, 1: 删除',
   `Fversion` INT NOT NULL DEFAULT 0 COMMENT '记录版本号',
   `Fmodify_user` VARCHAR(128) NOT NULL DEFAULT '' COMMENT '修改用户',
-  `Fcreate_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `Fmodify_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+  `Fcreate_time` DATETIME DEFAULT NULL COMMENT '创建时间',
+  `Fmodify_time` DATETIME DEFAULT NULL COMMENT '修改时间',
   PRIMARY KEY (`Fpurchase_order_id`),
   KEY `idx_order_type` (`Forder_type`),
   KEY `idx_supplier_name` (`Fsupplier_name`),
@@ -187,8 +187,8 @@ CREATE TABLE IF NOT EXISTS `t_sku_sale_estimate` (
   `Fis_delete` INT NOT NULL DEFAULT 0 COMMENT '是否逻辑删除, 1: 删除',
   `Fversion` INT NOT NULL DEFAULT 0 COMMENT '记录版本号',
   `Fmodify_user` VARCHAR(128) NOT NULL DEFAULT '' COMMENT '修改用户',
-  `Fcreate_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `Fmodify_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+  `Fcreate_time` DATETIME DEFAULT NULL COMMENT '创建时间',
+  `Fmodify_time` DATETIME DEFAULT NULL COMMENT '修改时间',
   PRIMARY KEY (`Fproject_id`, `Forder_date`, `Fsku`, `Fshop_id`),
   KEY `idx_sku_class` (`Fsku_class`),
   KEY `idx_sku_group` (`Fsku_group`),
@@ -211,8 +211,8 @@ CREATE TABLE IF NOT EXISTS `t_sku_picking_note` (
   `Fpkg_picking_unit` FLOAT COMMENT 'pkg打包，拣货单位（1个sku的换算）',
   `Fpkg_picking_unit_name` VARCHAR(256) COMMENT 'pkg打包，拣货单位名',
   `Fpicking_sku_name` VARCHAR(256) COMMENT '拣货sku名',
-  `Fcreate_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `Fmodify_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+  `Fcreate_time` DATETIME DEFAULT NULL COMMENT '创建时间',
+  `Fmodify_time` DATETIME DEFAULT NULL COMMENT '修改时间',
   PRIMARY KEY (`Fproject_id`, `Fsku`),
   KEY `idx_picking_sku_name` (`Fpicking_sku_name`),
   KEY `idx_create_time` (`Fcreate_time`),
@@ -228,10 +228,10 @@ CREATE TABLE IF NOT EXISTS `t_order_print_task` (
   `Fpdf_file_url` VARCHAR(256) COMMENT '打印的pdf地址',
   `Fcurrent_step` VARCHAR(1024) COMMENT '当前任务步骤',
   `Fprogress` INT COMMENT '当前进度0-100',
-  `Forder_list` JSON COMMENT '订单列表',
-  `Flogs` JSON COMMENT '处理日志',
-  `Fcreate_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `Fmodify_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+  `Forder_list` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '订单列表',
+  `Flogs` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '处理日志',
+  `Fcreate_time` DATETIME DEFAULT NULL COMMENT '创建时间',
+  `Fmodify_time` DATETIME DEFAULT NULL COMMENT '修改时间',
   PRIMARY KEY (`Fproject_id`, `Ftask_id`),
   KEY `idx_create_time` (`Fcreate_time`),
   KEY `idx_modify_time` (`Fmodify_time`)
@@ -240,7 +240,7 @@ CREATE TABLE IF NOT EXISTS `t_order_print_task` (
 -- ========================================
 -- 10. SKU销售价格表
 -- ========================================
-CREATE TABLE `t_sku_sale_price` (
+CREATE TABLE IF NOT EXISTS `t_sku_sale_price` (
   `Fproject_id` varchar(128) NOT NULL COMMENT '所属项目ID',
   `Fsku` varchar(128) NOT NULL COMMENT '商品SKU',
   `Funit_price` float DEFAULT NULL COMMENT '单价',
@@ -291,7 +291,7 @@ CREATE TABLE IF NOT EXISTS `t_sale_order` (
 -- 数据类型说明
 -- ========================================
 -- 1. 金额字段使用 INT 类型，单位为"分"，避免浮点数精度问题
--- 2. JSON 类型用于存储复杂结构数据（如角色列表、SKU列表等）
+-- 2. 复杂结构数据使用 LONGTEXT 存储 JSON 字符串，兼容 MariaDB 5.5
 -- 3. 日期字段根据需要使用 DATETIME 或 VARCHAR(128)
 -- 4. 布尔字段使用 TINYINT(1) 或 INT（0/1）
 

@@ -1,0 +1,14 @@
+---
+description: 后端接口变更时同步维护前端 mock
+globs: src/apis/**/*.ts,mock/**/*.ts,mock/api/data/**/*.json
+alwaysApply: false
+---
+
+# Mock API Sync
+
+- 后台新增、删除或改动 `/erp_api/*` 接口时，必须同步维护 `erp_static/mock/`，保证 `npm run dev:mock` 可用。
+- 前端接口调用统一封装在 `src/apis/`，不要在页面、组件或 store 中直接写后端 URL。
+- 新增接口时，在 `mock/api/{module}.ts` 的 `apiList` 注册相同 `url` 和 `method`；新增模块时还要在 `mock/index.ts` 汇总该模块。
+- Mock 响应 JSON 放在 `mock/api/data/` 下，路径必须与真实 API URL 对齐，例如 `/erp_api/supplier/search_supplier` 对应 `mock/api/data/erp_api/supplier/search_supplier.json`。
+- 如果接口返回结构、字段名、分页结构或错误场景变化，同步更新对应 JSON，保持与后端 `response_util.pack_*` 的响应壳一致。
+- 变更完成后优先用 `npm run dev:mock` 做本地页面验证；无法运行时在回复中说明未验证原因。

@@ -9,3 +9,5 @@ flask
 elasticsearch==7.14.2
 PyPDF2
 reportlab
+pycryptodome
+selenium

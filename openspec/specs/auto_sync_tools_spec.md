@@ -12,10 +12,10 @@
 | ---- | -------- | -------- | ---------- |
 | `auto_preload_order.py` | 预拉取新订单与待打印订单详情到本地 JSON 缓存 | 本地 JSON 缓存 | 否 |
 | `auto_return_refund_order_to_warehouse.py` | 退货自动入库 | BigSeller | 否 |
-| `sync_all_sku.py` | 同步全部 SKU 主数据到本地 JSON | 本地 JSON | 否 |
+| `sync_all_sku.py` | 通过统一 SellerClient（BigSeller / UpSeller）刷新本地 SKU 主数据缓存 | 本地 JSON | 否 |
 | `sync_order_to_es.py` | 同步 SKU 销售估算到 ES + MySQL | ES + MySQL（philipine 写死） | 否 |
 | `sync_shop_statics_to_es.py` | 同步店铺销售统计到 ES + 本地 JSON | ES + 本地 JSON | 否 |
-| `sync_sku_inventory.py` | 同步 SKU 库存到 MySQL | MySQL | 通过 `sync_tool_project_id` 切换 |
+| `sync_sku_inventory.py` | 通过统一 SellerClient（BigSeller / UpSeller）同步 SKU 库存到 MySQL | MySQL | 通过 `sync_tool_project_id` 切换 |
 
 ## 各脚本规约
 
@@ -51,9 +51,12 @@
 - 入口：`sync_all_sku()`
 - 流程：
   ```python
-  build_sku_manager().load_and_update_all_sku(build_big_seller_client())
+  build_seller_client().refresh_local_sku_cache()
   ```
-- 同步目标：本地 `cookies/all_sku.json` 等
+- ERP 路由：由 `application.json:use_up_seller` 决定，`seller_util.build_seller_client()` 统一选 `BigSellerAdapter` / `UpSellerAdapter`
+- 同步目标：
+  - BigSeller 路径 → `cookies/all_sku.json` + `cookies/all_variant_sku_mapping.json`
+  - UpSeller 路径 → `cookies/all_up_seller_sku.json`
 - 日志：无专用 logger（依赖 INVOKER）
 
 ### 4. `sync_order_to_es.py`
@@ -90,14 +93,22 @@
 - 入口：`sync_sku_inventory()`
 - 流程：
   1. `build_backend(config.get("sync_tool_project_id", "philipine"))` 获取后端
-  2. `build_big_seller_client()`
+  2. `build_seller_client()` 获取统一 `SellerClient`（自动选 BigSeller / UpSeller）
   3. `load_all_shipping_sku_info(backend)` 加载在途 SKU
   4. `backend.search_sku(...)` 批量
-  5. 每条 SKU：`query_sku_inventory_detail` + `query_sku_detail` 计算 `available`、`avg_sell_quantity`、`inventory_support_days`、`shipping_stock_quantity`
+  5. 每条 SKU：
+     - `seller.query_sku_detail(sku)` → `SkuDetail.inventory_in_warehouse / erp_sku_id / title / image_url`
+     - `seller.query_sku_inventory_detail(sku)` → `InventoryDetail.avg_daily_sales / title / image_url`
+     - 字段映射回 `t_sku_info`：`inventory / erp_sku_id / erp_sku_name / erp_sku_image_url`
+     - 销量与库存支撑天数：`avg_daily_sales > 0` 时按 `round(avg * 1.1, 2)` 刷新；为 0 则保留 DB 已有 `avg_sell_quantity`（典型 UpSeller，或 BigSeller 真无销量）
+     - `inventory_support_days = int(inventory / avg_sell_quantity)`（avg 有效）或 `inventory / 0.01`（零销兜底）
   6. `backend.store_sku(sku_dto)` 落库
-  7. `time.sleep(0.3)` 节流
+  7. 单条异常 `print` 后 `continue`，不中断整体任务
+  8. `time.sleep(0.3)` 节流
 - 同步目标：MySQL `t_sku_info`
 - 多 project：通过 `sync_tool_project_id` 切换，单次仍处理一个 project
+- UpSeller 兜底：`InventoryDetail.avg_daily_sales` 当前固定为 0（UpSeller `/api/warehouse-sku/list` 不暴露），脚本保留 DB 历史 `avg_sell_quantity`，避免清零
+- 体积字段：脚本不修改 `Fsku_pack_length / Fsku_pack_width / Fsku_pack_height`（与 `add-sku-pack-volume` 约束一致，复用 ORM 实例自动保留）
 - 日志：`print`
 
 ## 部署与定时任务
@@ -141,6 +152,7 @@
 | 问题 | 处理 |
 | ---- | ---- |
 | BigSeller 登录失效 | `build_big_seller_client()` 自动重新登录（cookie 过期） |
+| UpSeller cookie 失效 | `build_seller_client()` 单例命中后会触发 UpSeller selenium 登录；首次需在测试机执行 `tools/up_seller_selenium_cookie.py` 预热 cookie，再让 crontab 接管 |
 | ES 写入失败 | 当前 `print` 异常并继续，不会重试 |
 | MySQL 锁冲突 | 适当 `sleep` + 重试 |
 | 验证码识别消耗过快 | 检查是否频繁重新登录、cookie 持久化是否生效 |

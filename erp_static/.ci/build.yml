@@ -1,0 +1,15 @@
+version: v2.0
+
+on:
+  push: [ master ]
+  mr: [ master ]
+
+steps:
+- checkout: self
+- run: |
+    npm install && npm run build
+  name: "Node JS Build"
+
+notices:
+- type: wework-message
+  if: FAILURE

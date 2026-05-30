@@ -1,0 +1,14 @@
+---
+description: EC-ERP 前端项目通用上下文与工作方式
+alwaysApply: true
+---
+
+# EC-ERP Static Project
+
+- 本项目是 EC-ERP 前端，基于 Vue 3.2、TypeScript 4.8、Vite 2、Pinia、Vue Router、TDesign Vue Next。
+- 主要代码在 `src/`，API 在 `src/apis/`，页面在 `src/pages/`，公共组件在 `src/components/`，布局在 `src/layouts/`。
+- 优先沿用现有业务模块：`supply` 供应链、`warehouse` 仓库、`sales` 销售、`dashboard` 报表、`user` 登录。
+- 路径别名使用 `@/` 指向 `src/`，不要新增相对路径层级很深的导入。
+- UI 优先使用 TDesign 组件，样式使用 Less；全局 Less 变量已由 `vite.config.ts` 自动注入。
+- 保持现有 Prettier 风格：2 空格、单引号、分号、`printWidth: 120`、尾逗号。
+- 常用校验命令：`npm run lint`、`npm run stylelint`、`npm run build`。

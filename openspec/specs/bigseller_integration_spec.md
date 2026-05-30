@@ -156,6 +156,8 @@ Token 来源：`application.json:ydm_token`
 | `build_sku_manager()` | holder 60s | 读取 `cookies_dir/all_sku.json` 并 `load()` |
 | `build_backend(project_id)` | - | 创建无 session 耦合的 `MysqlBackend`（与 `request_context.get_backend` 区别） |
 
+> `build_big_seller_client` / `build_sku_manager` 仍服务于 `sync_order_to_es.py` / `sync_shop_statics_to_es.py` / `auto_preload_order.py` / `auto_return_refund_order_to_warehouse.py`；自动化 SKU/库存同步链路（`sync_all_sku.py` / `sync_sku_inventory.py`）已迁移至 `seller_util.build_seller_client()`，详见 [auto_sync_tools_spec.md](./auto_sync_tools_spec.md)。
+
 ## 错误处理与重试
 
 - 登录失败抛异常，由调用方决定是否重试

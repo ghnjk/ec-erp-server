@@ -45,7 +45,7 @@ class YdmVerify(object):
             "type": verify_type
         }
         print(payload)
-        resp = requests.post(self._custom_url, headers=self._headers, data=json.dumps(payload))
+        resp = requests.post(self._custom_url, headers=self._headers, data=json.dumps(payload), timeout=30)
         print(resp.text)
         return resp.json()
 

@@ -68,6 +68,58 @@ Supplier 模块提供供应商管理、SKU 主数据管理、SKU 采购价格、
 - 业务：触发全量同步本地 SKU 主数据库（依赖 BigSellerClient + SkuManager）
 - 返回：`pack_response({update_count, fail_count})`
 
+## SKU 打包体积字段要求
+
+### Requirement: `save_sku` 必须支持读写打包体积字段
+
+`/erp_api/supplier/save_sku` 请求体 SHALL 接受 `sku_pack_length`、`sku_pack_width`、`sku_pack_height` 3 个可选整型参数，分别表示每个采购单位的打包长、宽、高（单位：cm）。
+
+约束：
+- 服务端 SHALL 使用 `request_util.get_int_param("<field>", 0)` 读取，未传或传 `null` 时默认为 0。
+- 构造 `SkuDto` 时 SHALL 将 3 个字段透传到 ORM。
+- 响应 `data`（`DtoUtil.to_dict(SkuDto)`）SHALL 包含 3 个字段的当前值。
+
+#### Scenario: 旧客户端不传体积字段
+- **WHEN** 调用方不传 `sku_pack_length`、`sku_pack_width`、`sku_pack_height`
+- **THEN** 接口 SHALL 保持成功响应
+- **AND** 首次创建时数据库体积字段 SHALL 写入 0；已有记录覆盖式保存时，调用方应传完整字段以避免被默认值清零。
+
+#### Scenario: 客户端传完整体积字段
+- **WHEN** 请求体包含 `"sku_pack_length": 30, "sku_pack_width": 20, "sku_pack_height": 15`
+- **THEN** 落库后 `Fsku_pack_length=30`、`Fsku_pack_width=20`、`Fsku_pack_height=15`
+- **AND** 响应 JSON 中对应字段 SHALL 等于 30、20、15。
+
+### Requirement: `search_sku` 响应必须包含打包体积字段
+
+`/erp_api/supplier/search_sku` 返回的 `data.list[*]` SHALL 包含 `sku_pack_length`、`sku_pack_width`、`sku_pack_height` 3 个字段。
+
+#### Scenario: 分页查询返回体积字段
+- **WHEN** 调用 `/erp_api/supplier/search_sku` 任意查询条件
+- **THEN** 响应中每个 SKU 对象 SHALL 包含 3 个体积字段
+- **AND** 未填写的 SKU 体积字段值 SHALL 为 0。
+
+### Requirement: `add_sku` 默认体积字段为 0
+
+`/erp_api/supplier/add_sku` 在批量初始化 SKU 时 SHALL 写入体积字段默认值 0，且不新增请求参数。
+
+#### Scenario: 批量添加后体积字段为 0
+- **WHEN** 通过 `/erp_api/supplier/add_sku` 添加新 SKU
+- **THEN** 数据库中该 SKU 行的 3 个体积字段 SHALL 为 0
+- **AND** 调用 `search_sku` 返回值的 3 个体积字段 SHALL 为 0。
+
+### Requirement: `sync_all_sku` 不得覆盖打包体积字段
+
+`/erp_api/supplier/sync_all_sku` SHALL NOT 修改 `Fsku_pack_length`、`Fsku_pack_width`、`Fsku_pack_height`。
+
+#### Scenario: 同步前后体积保持
+- **GIVEN** 数据库中某 SKU 的体积为 30、20、15
+- **WHEN** 触发 `/erp_api/supplier/sync_all_sku`
+- **THEN** 同步完成后该 SKU 的体积 SHALL 仍为 30、20、15。
+
+### Requirement: SKU 相关接口文档必须同步更新
+
+受影响的 design 文档与业务文档 SHALL 同步更新体积字段说明：`openspec/specs/apis/design/supplier/save_sku.md`、`search_sku.md`、`add_sku.md`、`sync_all_sku.md`，以及 `docs/erp_api/supplier/save_sku.md`、`search_sku.md`。
+
 ### 6. `search_sku_purchase_price`
 
 - 参数：`current_page` (int)，`page_size` (int)

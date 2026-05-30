@@ -1,0 +1,26 @@
+node_modules
+.DS_Store
+.vscode
+.vscode/settings.json
+# build files
+es/
+lib/
+dist/
+dist.tgz
+typings/
+
+_site
+package
+tmp*
+temp*
+coverage
+test-report.html
+.idea/
+yarn-error.log
+*.zip
+.history
+.stylelintcache
+yarn.lock
+.vscode/
+.vscode
+.ftp
