@@ -1,0 +1,46 @@
+@import './variables.less';
+
+iframe{
+
+  border: 1px solid #f6f0f0; /* 设置边框宽度、样式和颜色 */
+  border-radius: 4px; /* 设置边框圆角 */
+}
+
+.table-container {
+  // 表格下的分页栏
+  .pagination {
+    border-top: 0;
+    padding: 14px 24px;
+  }
+  // 左侧操作区
+  .left-operation-container {
+    padding: 16px 0;
+  }
+}
+
+.more-detail {
+  > p {
+    display: inline-block;
+    margin: 4px 0;
+  }
+  > p.title {
+    width: 120px;
+    color: #999;
+  }
+}
+
+.operation-container {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  .expand {
+    .t-button__text {
+      display: flex;
+      align-items: center;
+    }
+    .t-icon {
+      margin-left: 4px;
+      transition: transform 0.3s ease;
+    }
+  }
+}

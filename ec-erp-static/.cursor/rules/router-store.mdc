@@ -1,0 +1,15 @@
+---
+description: 路由、权限与 Pinia 状态管理约定
+globs: src/router/**/*.ts,src/store/**/*.ts,src/permission.ts
+alwaysApply: false
+---
+
+# Router And Store
+
+- 路由模块放在 `src/router/modules/`，页面组件使用动态导入：`component: () => import('@/pages/...')`。
+- 菜单展示依赖 `meta.title`、`meta.icon`、`meta.hidden`、`meta.roleCode` 等字段，新增页面时保持字段完整。
+- 权限角色常量从 `src/config/global.ts` 引入，避免在路由里硬编码角色字符串。
+- 全局路由守卫逻辑集中在 `src/permission.ts`，不要在页面组件中复制登录态或权限判断。
+- Pinia store 放在 `src/store/modules/`，使用 `defineStore`，按业务模块拆分 state、getters、actions。
+- 需要在组件外使用 store 时沿用 `getUserStore()` 这类 helper，并从 `src/store` 注入的 store 实例获取。
+- 登录用户信息以 `src/store/modules/user.ts` 为准，新增依赖登录态的功能优先复用现有 user store。
