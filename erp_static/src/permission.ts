@@ -31,66 +31,46 @@ router.beforeEach(async (to, from, next) => {
   console.log('permission check: userInfo', userInfo, 'to', to);
   const { roles, isAdmin } = userStore;
 
+  // 当前会话已有权限信息, 页面内跳转直接放行 (注意: 每个分支必须保证 next 只被调用一次)
   if ((roles && roles.length > 0) || isAdmin) {
-    // 当已经在页面中, 跳转到其他页面, 会走这个逻辑
     next();
-  } else {
-    try {
-      await userStore.getLoginAccout();
-
-      const { roles, isAdmin, userInfo } = userStore;
-
-      console.log('permission get user info: userInfo', userInfo);
-      await permissionStore.initRoutes(roles, isAdmin);
-      if ((roles && roles.length > 0) || isAdmin) {
-        // 当已经在页面中, 跳转到其他页面, 会走这个逻辑
-        next();
-      }
-    } catch (e) {}
+    return;
   }
+
+  // 白名单路由直接放行
   if (whiteListRouters.includes(to.path)) {
     next();
-  } else if (userInfo) {
-    const { roles, isAdmin } = userStore;
+    return;
+  }
 
-    if ((roles && roles.length > 0) || isAdmin) {
-      // 当已经在页面中, 跳转到其他页面, 会走这个逻辑
-      next();
-    } else {
-      // 浏览器第一次输入url, 会进入这个逻辑
-      const authMsg = MessagePlugin.loading({ content: '校验用户权限中...', duration: 0 });
-      try {
-        await sleep(800);
-
-        await userStore.getLoginAccout();
-
-        const { roles, isAdmin, userInfo } = userStore;
-
-        console.log('permission get user info: userInfo', userInfo);
-
-        await permissionStore.initRoutes(roles, isAdmin);
-        if (router.hasRoute(to.name)) {
-          next();
-        } else {
-          next('/');
-        }
-        MessagePlugin.close(authMsg);
-      } catch (error) {
-        setTimeout(() => {
-          MessagePlugin.closeAll();
-          window.location.href = '#/login';
-        }, 800);
-        NProgress.done();
-      }
+  // 首次进入或刷新页面, 需要拉取用户信息并初始化路由权限
+  const authMsg = MessagePlugin.loading({ content: '校验用户权限中...', duration: 0 });
+  try {
+    if (!userInfo) {
+      await sleep(800);
     }
-  } else {
-    /* white list router */
-    if (whiteListRouters.includes(to.path)) {
-      next();
-    } else {
-      MessagePlugin.error('无用户信息, 请到power平台申请平台权限');
-    }
+    await userStore.getLoginAccout();
 
+    const { roles: newRoles, isAdmin: newIsAdmin, userInfo: newUserInfo } = userStore;
+    console.log('permission get user info: userInfo', newUserInfo);
+
+    await permissionStore.initRoutes(newRoles, newIsAdmin);
+    MessagePlugin.close(authMsg);
+
+    if ((newRoles && newRoles.length > 0) || newIsAdmin) {
+      next(router.hasRoute(to.name) ? undefined : '/');
+    } else {
+      MessagePlugin.error('无用户信息');
+      next(false);
+    }
+  } catch (error) {
+    MessagePlugin.close(authMsg);
+    next(false);
+    setTimeout(() => {
+      MessagePlugin.closeAll();
+      window.location.href = '#/login';
+    }, 800);
+  } finally {
     NProgress.done();
   }
 });

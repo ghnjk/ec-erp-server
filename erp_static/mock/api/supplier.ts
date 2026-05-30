@@ -7,6 +7,14 @@ const apiList = [
     method: 'post',
   },
   {
+    url: '/erp_api/supplier/add_supplier',
+    method: 'post',
+  },
+  {
+    url: '/erp_api/supplier/delete_supplier',
+    method: 'post',
+  },
+  {
     url: '/erp_api/supplier/search_sku',
     method: 'post',
   },

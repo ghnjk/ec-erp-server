@@ -1,4 +1,4 @@
-import { createRouter, createWebHashHistory, RouteRecordRaw, useRoute } from 'vue-router';
+import { createRouter, createWebHashHistory, RouteRecordRaw } from 'vue-router';
 
 import uniq from 'lodash/uniq';
 import baseRouters from './modules/base';
@@ -59,8 +59,8 @@ export const getRoutesExpanded = () => {
 };
 
 export const getActive = (maxLevel = 3): string => {
-  const route = useRoute();
-  if (!route.path) {
+  const route = router.currentRoute.value;
+  if (!route || !route.path) {
     return '';
   }
   return route.path

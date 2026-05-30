@@ -9,6 +9,20 @@ export const searchSupplier = (req: any) => {
   return request.post<any, PageVO>('/erp_api/supplier/search_supplier', req);
 };
 /**
+ * 添加供应商
+ * @param req
+ */
+export const addSupplier = (req: any) => {
+  return request.post<any, any>('/erp_api/supplier/add_supplier', req);
+};
+/**
+ * 删除供应商
+ * @param req
+ */
+export const deleteSupplier = (req: any) => {
+  return request.post<any, any>('/erp_api/supplier/delete_supplier', req);
+};
+/**
  * 检索商品SKU
  * @param req
  */

@@ -15,7 +15,7 @@ from flask import (
 )
 from ec_erp_api.common.seller_util import build_seller_client
 from ec.seller_client import StockMoveItem
-from ec_erp_api.models.mysql_backend import PurchaseOrder, SkuDto, SkuPurchasePriceDto, DtoUtil
+from ec_erp_api.models.mysql_backend import PurchaseOrder, SkuDto, SkuPurchasePriceDto, SupplierDto, DtoUtil
 
 supplier_apis = Blueprint('supplier', __name__)
 
@@ -32,6 +32,49 @@ def search_supplier():
         offset = 0
     total, records = request_context.get_backend().search_suppliers(offset, page_size)
     return response_util.pack_pagination_result(total, records)
+
+
+@supplier_apis.route('/add_supplier', methods=["POST"])
+@api_post_request()
+def add_supplier():
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
+    supplier_name = request_util.get_str_param("supplier_name")
+    if supplier_name is not None:
+        supplier_name = supplier_name.strip()
+    if not supplier_name:
+        return response_util.pack_error_response(1003, "供应商名不能为空")
+    wechat_account = request_util.get_str_param("wechat_account")
+    wechat_account = wechat_account.strip() if wechat_account else ""
+    detail = request_util.get_str_param("detail")
+    detail = detail.strip() if detail else ""
+    backend = request_context.get_backend()
+    if backend.get_supplier_by_name(supplier_name) is not None:
+        return response_util.pack_error_response(1003, f"供应商 [{supplier_name}] 已存在")
+    current_user = request_context.get_current_user()
+    supplier = SupplierDto(
+        supplier_id=0,
+        project_id=request_context.get_current_project_id(),
+        supplier_name=supplier_name,
+        wechat_account=wechat_account,
+        detail=detail,
+        is_delete=0,
+        modify_user=current_user.user_name if current_user is not None else ""
+    )
+    backend.store_supplier(supplier)
+    return response_util.pack_response(DtoUtil.to_dict(supplier))
+
+
+@supplier_apis.route('/delete_supplier', methods=["POST"])
+@api_post_request()
+def delete_supplier():
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
+    supplier_id = request_util.get_int_param("supplier_id")
+    if supplier_id is None or supplier_id <= 0:
+        return response_util.pack_error_response(1003, "supplier_id无效")
+    request_context.get_backend().delete_supplier(supplier_id)
+    return response_util.pack_response({})
 
 
 @supplier_apis.route('/search_sku', methods=["POST"])
