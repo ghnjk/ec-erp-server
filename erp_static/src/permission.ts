@@ -56,7 +56,13 @@ router.beforeEach(async (to, from, next) => {
     MessagePlugin.close(authMsg);
 
     if ((newRoles && newRoles.length > 0) || newIsAdmin) {
-      next(router.hasRoute(to.name) ? undefined : '/');
+      // 已登录用户落在登录页, 或目标路由不可访问时, 跳转到(此时已初始化的)首个有权限页面
+      // 注意: 路由级别的重定向先于守卫执行, 那时 routers 还是空, 因此首页/兜底重定向只能算出 /login, 这里再纠正一次
+      if (to.path === '/login' || !router.hasRoute(to.name)) {
+        next(permissionStore.getFirstAuthRoutePath);
+      } else {
+        next();
+      }
     } else if (isWhiteList) {
       // 无登录态但属于白名单页面, 允许匿名访问
       next();
