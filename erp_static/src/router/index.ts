@@ -3,6 +3,16 @@ import { createRouter, createWebHashHistory, RouteRecordRaw } from 'vue-router';
 import uniq from 'lodash/uniq';
 import baseRouters from './modules/base';
 import userRouters from './modules/user';
+import { getPermissionStore } from '@/store/modules/permission';
+
+// 动态重定向: 跳转到当前用户第一个有权限访问的路由, 避免写死路径导致无权限用户进入死循环
+const redirectToFirstAuthRoute = (): string => {
+  try {
+    return getPermissionStore().getFirstAuthRoutePath;
+  } catch (e) {
+    return '/login';
+  }
+};
 
 // 关于单层路由，meta 中设置 { single: true } 即可为单层路由，{ hidden: true } 即可在侧边栏隐藏该路由
 
@@ -16,12 +26,12 @@ export const asyncRouterList: Array<RouteRecordRaw> = [
 const defaultRouterList: Array<RouteRecordRaw> = [
   {
     path: '/',
-    redirect: '/supply',
+    redirect: redirectToFirstAuthRoute,
   },
   {
     path: '/:w+',
     name: '404Page',
-    redirect: '/flow_result/404',
+    redirect: redirectToFirstAuthRoute,
   },
 ];
 

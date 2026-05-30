@@ -56,6 +56,20 @@ export const usePermissionStore = defineStore('permission', {
     routers: [],
     removeRoutes: [],
   }),
+  getters: {
+    // 返回当前用户第一个有权限访问的路由路径, 用于首页/兜底重定向, 避免跳到无权限路由造成死循环
+    getFirstAuthRoutePath(): string {
+      const first = this.routers[0] as RouteRecordRaw | undefined;
+      if (!first) return '/login';
+      // children 已被权限过滤, 取第一个可访问子路由, 避免落到被移除的 redirect 目标导致死循环
+      const child = (first.children ?? [])[0];
+      if (child) {
+        return child.path.startsWith('/') ? child.path : `${first.path}/${child.path}`.replace(/\/+/g, '/');
+      }
+      if (typeof first.redirect === 'string') return first.redirect;
+      return first.path;
+    },
+  },
   actions: {
     async initRoutes(roles: Array<IRole>, isAdmin: boolean) {
       const roleNames: string[] = roles.map((obj): string => {
