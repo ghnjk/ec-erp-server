@@ -37,13 +37,11 @@ router.beforeEach(async (to, from, next) => {
     return;
   }
 
-  // 白名单路由直接放行
-  if (whiteListRouters.includes(to.path)) {
-    next();
-    return;
-  }
+  // 是否为免登录白名单路由 (允许匿名访问)
+  const isWhiteList = whiteListRouters.includes(to.path);
 
   // 首次进入或刷新页面, 需要拉取用户信息并初始化路由权限
+  // 注意: 白名单路由也要尝试初始化, 否则已登录用户(如仓库角色首页恰好在白名单内)菜单不会生成
   const authMsg = MessagePlugin.loading({ content: '校验用户权限中...', duration: 0 });
   try {
     if (!userInfo) {
@@ -59,17 +57,25 @@ router.beforeEach(async (to, from, next) => {
 
     if ((newRoles && newRoles.length > 0) || newIsAdmin) {
       next(router.hasRoute(to.name) ? undefined : '/');
+    } else if (isWhiteList) {
+      // 无登录态但属于白名单页面, 允许匿名访问
+      next();
     } else {
       MessagePlugin.error('无用户信息');
       next(false);
     }
   } catch (error) {
     MessagePlugin.close(authMsg);
-    next(false);
-    setTimeout(() => {
-      MessagePlugin.closeAll();
-      window.location.href = '#/login';
-    }, 800);
+    // 拉取用户信息失败时, 白名单页面仍允许匿名访问, 其余跳转登录
+    if (isWhiteList) {
+      next();
+    } else {
+      next(false);
+      setTimeout(() => {
+        MessagePlugin.closeAll();
+        window.location.href = '#/login';
+      }, 800);
+    }
   } finally {
     NProgress.done();
   }
