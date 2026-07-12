@@ -1,0 +1,7 @@
+{
+  "name": "ec-erp-upseller-tools",
+  "private": true,
+  "dependencies": {
+    "jsdom": "^24.1.3"
+  }
+}

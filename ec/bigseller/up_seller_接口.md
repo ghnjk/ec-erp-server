@@ -85,6 +85,29 @@ UpSeller 与 BigSeller 的 Web 接口思路相似：前端通过 cookie 维持�
 当 `getCountryCode` 返回 CN 时仍需注入 TencentCaptcha token/randStr。
 如需走自定义加密通路，可在构造 `UpSellerClient` 时通过 `login_body_encoder=` 注入。
 
+#### Linux 纯协议自动登录（推荐）
+
+脚本：`tools/up_seller_cookie.py`（不依赖 Chrome / Selenium）
+
+1. 图片验证码：`GET /api/vcode` + 云码 `YdmVerify.common_verify(..., "10110")`
+2. 人机校验：
+   - CN：`tools/upseller_tencent_captcha.js`（Node.js + jsdom 调用 `TencentCaptcha` appId=`191710692`）
+   - 非 CN：云码 funnel `type=40012` 解 Cloudflare Turnstile（sitekey=`0x4AAAAAABkb_WPRtUan3GGn`）
+3. 提交 `POST /api/login`；若返回 `score < 0.7`，自动 `POST /api/send-code`，再带邮箱验证码调用 `POST /api/login-recaptcha`
+
+```bash
+cd tools && npm install   # 仅首次，安装 jsdom
+python tools/up_seller_cookie.py \
+  --email 'xxx@xx.com' \
+  --password '***' \
+  --ydm-token '***'
+
+# 若触发邮箱二次校验，查收验证码后：
+python tools/up_seller_cookie.py \
+  --email 'xxx@xx.com' --password '***' --ydm-token '***' \
+  --email-code '123456' --force
+```
+
 ## 2. SKU 信息查询
 
 ### SKU 列表（单 SKU / KIT）

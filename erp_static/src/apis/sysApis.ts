@@ -24,6 +24,22 @@ export const getBackendErpStatus = () => {
   return request.post<any, BackendErpStatus>('/erp_api/system/get_backend_erp_status', {});
 };
 
+export type UpSellerManualLoginStatus = 'logged_in' | 'need_email_code' | 'failed' | string;
+
+export interface UpSellerManualLoginResult {
+  login_status: UpSellerManualLoginStatus;
+  logs: string;
+  exit_code: number;
+  message: string;
+}
+
+/**
+ * UpSeller 人工登录（两阶段：无参发码 / 带 email_code 完成登录）
+ */
+export const upSellerManualLogin = (payload: { email_code?: string } = {}) => {
+  return request.post<any, UpSellerManualLoginResult>('/erp_api/system/up_seller_manual_login', payload);
+};
+
 /**
  * 用户登录
  */

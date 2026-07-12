@@ -9,10 +9,12 @@ import base64
 import json
 import logging
 import os
+import subprocess
 import tempfile
 import time
 import typing
 import uuid
+from pathlib import Path
 
 import requests
 
@@ -31,6 +33,11 @@ _UP_SELLER_LOGIN_KEY_CN = b"2Y4Mgj$hwJV6qa62z64#b2!HkLz2pP5g"
 _UP_SELLER_LOGIN_KEY_APP = _UP_SELLER_LOGIN_KEY_CN
 # 前端 `c.S(t, e)` 在拼接 `t` 与 `e` 时使用的字面分隔符，对应 UTF-8 字节 0xC2 0xB1 0xC2 0xB1
 _UP_SELLER_JOIN_SEP = "\u00b1\u00b1"
+# 登录页人机校验：CN -> TencentCaptcha(smart)；非 CN -> Cloudflare Turnstile。
+_UP_SELLER_TENCENT_CAPTCHA_APP_ID = "191710692"
+_UP_SELLER_TURNSTILE_SITEKEY = "0x4AAAAAABkb_WPRtUan3GGn"
+# 云码 funnel 类型：Cloudflare Turnstile（参数 sitekey + pageurl）
+_UP_SELLER_YDM_TURNSTILE_TYPE = "40012"
 
 
 def _up_seller_aes_encrypt(plaintext: str, key: bytes) -> str:
@@ -113,13 +120,18 @@ class UpSellerClient:
             login_mode: str = "api",
             selenium_timeout: int = 120,
             selenium_headless: bool = True,
-            selenium_driver_path: typing.Optional[str] = None):
+            selenium_driver_path: typing.Optional[str] = None,
+            email_verify_code: typing.Optional[str] = None,
+            tencent_captcha_script: typing.Optional[str] = None,
+            node_bin: str = "node"):
         self.base_url = "https://app.upseller.com"
         self.home_web_url = f"{self.base_url}/zh-CN/home"
         self.login_web_url = f"{self.base_url}/zh-CN/login"
         self.check_login_url = f"{self.base_url}/api/is-login"
         self.user_info_url = f"{self.base_url}/api/user-info"
         self.login_url = f"{self.base_url}/api/login"
+        self.login_recaptcha_url = f"{self.base_url}/api/login-recaptcha"
+        self.send_code_url = f"{self.base_url}/api/send-code"
         self.country_code_url = f"{self.base_url}/api/getCountryCode"
         self.verify_code_url = f"{self.base_url}/api/vcode"
         self.sku_list_url = f"{self.base_url}/api/sku/index-single"
@@ -137,12 +149,17 @@ class UpSellerClient:
 
         self.session = requests.Session()
         self.auto_verify_coder = YdmVerify(ydm_token)
+        self.ydm_token = ydm_token
         self.cookies_file_path = cookies_file_path
         self.login_body_encoder = login_body_encoder
         self.login_mode = login_mode
         self.selenium_timeout = selenium_timeout
         self.selenium_headless = selenium_headless
         self.selenium_driver_path = selenium_driver_path
+        self.email_verify_code = email_verify_code
+        self.node_bin = node_bin or "node"
+        default_script = Path(__file__).resolve().parents[2] / "tools" / "upseller_tencent_captcha.js"
+        self.tencent_captcha_script = tencent_captcha_script or str(default_script)
         self.default_timeout = 30
         self.logger = logging.getLogger("INVOKER")
         self.device_id = str(uuid.uuid4())
@@ -151,15 +168,15 @@ class UpSellerClient:
             "Origin": self.base_url,
             "Referer": self.login_web_url,
             "User-Agent": (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "Mozilla/5.0 (X11; Linux x86_64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/124.0.0.0 Safari/537.36"
             ),
             "DeviceId": self.device_id,
         })
 
-    def login(self, email: str, password: str, remember: bool = True):
-        if self.load_cookies() and self.is_login():
+    def login(self, email: str, password: str, remember: bool = True, force: bool = False):
+        if not force and self.load_cookies() and self.is_login():
             self.logger.info("use upseller cookie login ok")
             print("use upseller cookie login ok")
             return
@@ -177,7 +194,7 @@ class UpSellerClient:
             "Origin": self.base_url,
             "Referer": self.login_web_url,
             "User-Agent": (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "Mozilla/5.0 (X11; Linux x86_64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/124.0.0.0 Safari/537.36"
             ),
@@ -186,6 +203,7 @@ class UpSellerClient:
         self.get(self.login_web_url)
         verify_code = self.get_valid_verify_code(email)
         country_code = self.get_country_code()
+        human_token, human_rand = self._get_human_captcha_token(country_code)
         login_payload = {
             "email": email.strip(),
             "password": password,
@@ -193,20 +211,191 @@ class UpSellerClient:
             "remember": 1 if remember else 0,
             "timeStamper": int(time.time() * 1000),
             "deviceId": self.device_id,
-            "token": None,
-            "randStr": None,
+            "token": human_token,
+            "randStr": human_rand,
         }
-        if country_code == "CN":
-            self.logger.info("upseller login in CN may require TencentCaptcha token")
-        self.logger.debug(f"upseller login_payload: {json.dumps(login_payload, ensure_ascii=False)}")
+        self.logger.info(
+            f"upseller api login country={country_code} "
+            f"has_token={bool(human_token)} has_randStr={bool(human_rand)}")
+        self.logger.debug(
+            f"upseller login_payload: {json.dumps(login_payload, ensure_ascii=False)}")
 
         encoder = self.login_body_encoder or build_default_login_body_encoder(country_code)
         encrypted_body = encoder(login_payload)
         res = self.post_form(self.login_url, {"body": encrypted_body}).json()
+        if res.get("code") == 0 and self.is_login():
+            self.save_cookies()
+            return
+
+        # 前端：code!=0 且 score<0.7 时跳转 login-code，走邮箱二次验证。
+        score = None
+        if isinstance(res.get("data"), dict):
+            score = res["data"].get("score")
+        need_email = (
+            res.get("code") != 0
+            and score is not None
+            and float(score) < 0.7
+        ) or res.get("code") in (-1, -6)
+        if need_email:
+            self.logger.info(
+                f"upseller login needs email verify, code={res.get('code')} "
+                f"score={score}")
+            self._login_by_email_code(email, password, remember, auth_type=1)
+            return
+
+        raise Exception(f"upseller login failed: {json.dumps(res, ensure_ascii=False)}")
+
+    def _get_human_captcha_token(
+            self, country_code: typing.Optional[str]
+    ) -> typing.Tuple[typing.Optional[str], typing.Optional[str]]:
+        """按国家返回登录人机校验 token。
+
+        - CN: Node.js + jsdom 调用 TencentCaptcha(smart)，返回 (ticket, randstr)
+        - 非 CN: 云码 funnel type=40012 解 Cloudflare Turnstile，返回 (token, None)
+        """
+        if country_code == "CN":
+            try:
+                ticket_info = self.get_tencent_captcha_token()
+                return ticket_info.get("ticket"), ticket_info.get("randstr")
+            except Exception as e:
+                self.logger.error(f"get tencent captcha token failed: {e}")
+                return None, None
+        try:
+            token = self.get_turnstile_token()
+            return token, None
+        except Exception as e:
+            self.logger.error(f"get turnstile token failed: {e}")
+            return None, None
+
+    def get_tencent_captcha_token(
+            self, captcha_app_id: str = _UP_SELLER_TENCENT_CAPTCHA_APP_ID
+    ) -> dict:
+        """通过 tools/upseller_tencent_captcha.js（Node+jsdom）获取腾讯验证码 ticket。"""
+        script = self.tencent_captcha_script
+        if not os.path.isfile(script):
+            raise FileNotFoundError(f"tencent captcha script not found: {script}")
+        env = os.environ.copy()
+        env["UPSELLER_LOGIN_URL"] = self.login_web_url
+        proc = subprocess.run(
+            [self.node_bin, script, captcha_app_id],
+            cwd=str(Path(script).resolve().parent),
+            capture_output=True,
+            text=True,
+            timeout=90,
+            env=env,
+            check=False)
+        if proc.returncode != 0:
+            raise Exception(
+                f"tencent captcha node failed: rc={proc.returncode} "
+                f"stderr={proc.stderr.strip()[:500]}")
+        lines = [ln.strip() for ln in proc.stdout.splitlines() if ln.strip()]
+        if not lines:
+            raise Exception(f"tencent captcha empty stdout, stderr={proc.stderr[:300]}")
+        data = json.loads(lines[-1])
+        if not data.get("ticket"):
+            raise Exception(f"tencent captcha missing ticket: {data}")
+        return data
+
+    def get_turnstile_token(
+            self,
+            sitekey: str = _UP_SELLER_TURNSTILE_SITEKEY,
+            pageurl: typing.Optional[str] = None,
+            poll_times: int = 40,
+            poll_interval: float = 3.0) -> str:
+        """通过云码 funnelApi type=40012 获取 Cloudflare Turnstile token。"""
+        pageurl = pageurl or self.login_web_url
+        create = requests.post(
+            "http://api.jfbym.com/api/YmServer/funnelApi",
+            json={
+                "token": self.ydm_token,
+                "type": _UP_SELLER_YDM_TURNSTILE_TYPE,
+                "sitekey": sitekey,
+                "pageurl": pageurl,
+                "googlekey": sitekey,
+            },
+            timeout=60).json()
+        if create.get("code") != 10000:
+            raise Exception(f"ydm turnstile create failed: {create}")
+        captcha_id = create["data"]["captchaId"]
+        record_id = create["data"]["recordId"]
+        for _ in range(poll_times):
+            time.sleep(poll_interval)
+            result = requests.post(
+                "http://api.jfbym.com/api/YmServer/funnelApiResult",
+                json={
+                    "token": self.ydm_token,
+                    "captchaId": captcha_id,
+                    "recordId": record_id,
+                },
+                timeout=30).json()
+            if result.get("msg") == "结果准备中，请稍后再试":
+                continue
+            if result.get("code") == 10001 and result.get("data"):
+                data = result["data"]
+                token = data.get("data") if isinstance(data, dict) else data
+                if token:
+                    return str(token)
+            raise Exception(f"ydm turnstile result failed: {result}")
+        raise TimeoutError("ydm turnstile poll timeout")
+
+    def send_login_email_code(self, email: str, source: str = "recaptcha", language: str = "zh-CN"):
+        res = self.post_form(self.send_code_url, {
+            "email": email.strip(),
+            "language": language,
+            "source": source,
+        }).json()
+        self._check_response(res, "send_login_email_code")
+        return res
+
+    def _login_by_email_code(
+            self,
+            email: str,
+            password: str,
+            remember: bool = True,
+            auth_type: int = 1,
+            verify_code: typing.Optional[str] = None):
+        """登录风控二次校验：发送邮箱验证码并调用 /api/login-recaptcha。"""
+        code = verify_code or self.email_verify_code
+        if not code:
+            self.send_login_email_code(email)
+            raise Exception(
+                "upseller login requires email verification code. "
+                "Code has been sent to the account email. "
+                "Re-run with email_verify_code / --email-code.")
+        self.login_with_email_code(
+            email=email,
+            password=password,
+            verify_code=str(code).strip(),
+            remember=remember,
+            auth_type=auth_type)
+
+    def login_with_email_code(
+            self,
+            email: str,
+            password: str,
+            verify_code: str,
+            remember: bool = True,
+            auth_type: int = 1):
+        time_stamper = int(time.time() * 1000)
+        key = _UP_SELLER_LOGIN_KEY_APP
+        encrypted_password = _up_seller_cs_encode(password, time_stamper, key=key)
+        payload = {
+            "email": email.strip(),
+            "password": encrypted_password,
+            "authType": auth_type,
+            "verifyCode": str(verify_code).strip(),
+            "remember": 1 if remember else 0,
+            "timeStamper": time_stamper,
+            "deviceId": self.device_id,
+        }
+        body = _up_seller_cs_encode(
+            json.dumps(payload, separators=(",", ":"), ensure_ascii=False), key=key)
+        res = self.post_form(self.login_recaptcha_url, {"body": body}).json()
         if res.get("code") != 0:
-            raise Exception(f"upseller login failed: {json.dumps(res, ensure_ascii=False)}")
+            raise Exception(
+                f"upseller login-recaptcha failed: {json.dumps(res, ensure_ascii=False)}")
         if not self.is_login():
-            raise Exception("upseller login failed: is_login=false")
+            raise Exception("upseller login-recaptcha failed: is_login=false")
         self.save_cookies()
 
     def __login_by_selenium(self, email: str, password: str, remember: bool = True):
@@ -404,9 +593,16 @@ class UpSellerClient:
                 image_base64 = image_base64[len("data:image/jpg;base64,"):]
             elif image_base64.startswith("data:image/png;base64,"):
                 image_base64 = image_base64[len("data:image/png;base64,"):]
-            verify_res = self.auto_verify_coder.common_verify(image_base64, "10110")
+            # 云码调试 print 很吵，这里临时抑制 stdout
+            import io
+            from contextlib import redirect_stdout
+            with redirect_stdout(io.StringIO()):
+                verify_res = self.auto_verify_coder.common_verify(image_base64, "10110")
             if verify_res["code"] == 10000:
-                return verify_res["data"]["data"]
+                code = str(verify_res["data"]["data"]).strip()
+                # 登录页验证码为 4 位数英
+                if len(code) == 4:
+                    return code
             time.sleep(3)
         raise Exception("get_valid_verify_code failed.")
 

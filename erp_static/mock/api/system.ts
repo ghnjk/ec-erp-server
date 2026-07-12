@@ -11,6 +11,10 @@ const apiList = [
     method: 'post',
   },
   {
+    url: '/erp_api/system/up_seller_manual_login',
+    method: 'post',
+  },
+  {
     url: '/erp_api/system/login_user_with_token',
     method: 'post',
   },

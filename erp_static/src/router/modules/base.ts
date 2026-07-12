@@ -118,4 +118,22 @@ export default [
     component: () => import('@/pages/warehouse/stocktaking.vue'),
     meta: { title: '仓库盘点', hidden: false, icon: ListIcon, roleCode: [USER_ROLE_SUPPLIER] },
   },
+  {
+    path: '/system',
+    component: Layout,
+    name: 'system',
+    meta: { title: '系统', hidden: true },
+    children: [
+      {
+        path: 'upSellerManualLogin',
+        name: 'UpSellerManualLogin',
+        component: () => import('@/pages/system/upSellerManualLogin.vue'),
+        meta: {
+          title: 'UpSeller人工登录',
+          hidden: true,
+          roleCode: [USER_ROLE_ADMIN, USER_ROLE_SUPPLIER, USER_ROLE_WAREHOUSE],
+        },
+      },
+    ],
+  },
 ];

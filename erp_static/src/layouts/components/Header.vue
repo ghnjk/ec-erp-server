@@ -59,6 +59,14 @@
               <span class="erp-status-text">{{ erpStatusButtonText }}</span>
             </t-button>
           </t-popup>
+          <t-button
+            v-if="showUpSellerManualLogin"
+            theme="warning"
+            variant="text"
+            @click="goUpSellerManualLogin"
+          >
+            人工登陆
+          </t-button>
           <menu-content :nav-data="menu.filter((item) => item.group === undefined)" class="header-menu" />
           <t-tooltip content="个人信息" placement="bottom">
             <t-button class="header-user-btn" theme="default" variant="text">
@@ -191,6 +199,18 @@ const erpStatusButtonText = computed(() => {
   if (!erpStatus.value) return erpStatusError.value ? 'ERP 检测失败' : 'ERP 未检测';
   return `${erpStatusTypeText.value} · ${erpStatusLoginText.value}`;
 });
+
+const showUpSellerManualLogin = computed(() => {
+  return Boolean(
+    erpStatus.value
+    && erpStatus.value.erp_type === 'up_seller'
+    && !erpStatus.value.is_login,
+  );
+});
+
+const goUpSellerManualLogin = () => {
+  router.push({ name: 'UpSellerManualLogin' });
+};
 
 const refreshErpStatus = async () => {
   if (erpStatusLoading.value) return;

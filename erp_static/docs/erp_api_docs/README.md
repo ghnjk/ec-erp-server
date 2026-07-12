@@ -52,6 +52,7 @@
 | [用户登录](./system/login_user.md) | `/erp_api/system/login_user` | 用户名密码登录 |
 | [获取登录用户信息](./system/get_login_user_info.md) | `/erp_api/system/get_login_user_info` | 获取当前登录用户信息 |
 | [获取后端ERP登录状态](./system/get_backend_erp_status.md) | `/erp_api/system/get_backend_erp_status` | 获取后端 seller ERP 类型、邮箱、仓库ID和登录态 |
+| [UpSeller人工登录](./system/up_seller_manual_login.md) | `/erp_api/system/up_seller_manual_login` | 触发 UpSeller 协议登录（支持邮箱二次校验），返回日志与登录状态 |
 
 ### Supplier 模块（供应商管理）
 

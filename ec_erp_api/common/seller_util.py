@@ -17,7 +17,10 @@ BigSellerAdapter / UpSellerAdapter。
 import contextlib
 import io
 import os
+import subprocess
+import sys
 import time
+from typing import Optional
 
 from ec.big_seller_adapter import BigSellerAdapter
 from ec.bigseller.big_seller_client import BigSellerClient
@@ -28,6 +31,10 @@ from ec.up_seller_adapter import UpSellerAdapter
 from ec.upseller_sku_manager import UpSellerSkuManager
 from ec_erp_api.app_config import get_app_config
 from ec_erp_api.common.singleton import CachedSingletonInstanceHolder
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_UP_SELLER_COOKIE_SCRIPT = os.path.join(_REPO_ROOT, "tools", "up_seller_cookie.py")
+_UP_SELLER_MANUAL_LOGIN_TIMEOUT_SEC = 300
 
 __SELLER_CLIENT__ = CachedSingletonInstanceHolder(timeout_sec=300)
 __SELLER_LOGIN_TIME__ = None
@@ -187,3 +194,93 @@ def build_seller_client() -> SellerClient:
         instance.login()
         __SELLER_LOGIN_TIME__ = current
     return instance
+
+
+def _map_up_seller_login_status(exit_code: int) -> str:
+    if exit_code == 0:
+        return "logged_in"
+    if exit_code == 2:
+        return "need_email_code"
+    return "failed"
+
+
+def _up_seller_login_status_message(login_status: str) -> str:
+    if login_status == "logged_in":
+        return "UpSeller 登录成功"
+    if login_status == "need_email_code":
+        return "需要邮箱验证码，请查收邮件后再次提交"
+    return "UpSeller 登录失败"
+
+
+def run_up_seller_manual_login(email_code: Optional[str] = None) -> dict:
+    """通过当前解释器调用 tools/up_seller_cookie.py 完成 UpSeller 人工登录。
+
+    - 无 email_code：第一阶段（发码 / 尝试登录）
+    - 有 email_code：第二阶段（带验证码完成 login-recaptcha）
+    """
+    if not _is_up_seller_enabled():
+        raise ValueError("当前环境未启用 UpSeller（use_up_seller != true）")
+
+    config = get_app_config()
+    up_cfg = config.get("up_seller") or {}
+    email = (up_cfg.get("mail") or "").strip()
+    password = up_cfg.get("password") or ""
+    ydm_token = (config.get("ydm_token") or "").strip()
+    cookies_dir = config.get("cookies_dir", "../cookies")
+    cookie_file = os.path.join(cookies_dir, "up_seller.cookies")
+
+    if not email or not password:
+        raise ValueError("application.json 缺少 up_seller.mail / up_seller.password")
+    if not ydm_token:
+        raise ValueError("application.json 缺少 ydm_token")
+    if not os.path.isfile(_UP_SELLER_COOKIE_SCRIPT):
+        raise FileNotFoundError(f"找不到登录脚本: {_UP_SELLER_COOKIE_SCRIPT}")
+
+    cmd = [
+        sys.executable,
+        _UP_SELLER_COOKIE_SCRIPT,
+        "--email", email,
+        "--password", password,
+        "--ydm-token", ydm_token,
+        "--cookie-file", cookie_file,
+        "--force",
+    ]
+    code = (email_code or "").strip()
+    if code:
+        cmd.extend(["--email-code", code])
+
+    try:
+        completed = subprocess.run(
+            cmd,
+            cwd=_REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=_UP_SELLER_MANUAL_LOGIN_TIMEOUT_SEC,
+        )
+        exit_code = int(completed.returncode)
+        logs = "".join([
+            completed.stdout or "",
+            completed.stderr or "",
+        ])
+    except subprocess.TimeoutExpired as e:
+        exit_code = -1
+        out = e.stdout if isinstance(e.stdout, str) else (
+            e.stdout.decode("utf-8", errors="replace") if e.stdout else "")
+        err = e.stderr if isinstance(e.stderr, str) else (
+            e.stderr.decode("utf-8", errors="replace") if e.stderr else "")
+        logs = f"{out}{err}\n登录脚本超时（>{_UP_SELLER_MANUAL_LOGIN_TIMEOUT_SEC}s）\n"
+
+    login_status = _map_up_seller_login_status(exit_code)
+    # 成功后顺带校验 cookie，不阻断以 exit code 为准的主状态
+    if login_status == "logged_in":
+        try:
+            query_seller_status()
+        except Exception:
+            pass
+
+    return {
+        "login_status": login_status,
+        "logs": logs,
+        "exit_code": exit_code,
+        "message": _up_seller_login_status_message(login_status),
+    }

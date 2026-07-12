@@ -12,7 +12,7 @@ from flask import (
 )
 from ec_erp_api.common import codec_util
 from ec_erp_api.common.api_core import api_post_request
-from ec_erp_api.common.seller_util import query_seller_status
+from ec_erp_api.common.seller_util import query_seller_status, run_up_seller_manual_login
 
 system_apis = Blueprint('system', __name__)
 
@@ -83,3 +83,18 @@ def get_backend_erp_status():
     if request_context.get_current_user() is None:
         return response_util.pack_error_json_response(1001, "not login.")
     return response_util.pack_json_response(query_seller_status())
+
+
+@system_apis.route("/up_seller_manual_login", methods=["POST"])
+@api_post_request()
+def up_seller_manual_login():
+    if request_context.get_current_user() is None:
+        return response_util.pack_error_json_response(1001, "not login.")
+    email_code = request_util.get_str_param("email_code", erase_empty_str=True)
+    try:
+        result = run_up_seller_manual_login(email_code=email_code)
+    except ValueError as e:
+        return response_util.pack_error_json_response(1003, str(e))
+    except FileNotFoundError as e:
+        return response_util.pack_error_json_response(1003, str(e))
+    return response_util.pack_json_response(result)

@@ -169,3 +169,7 @@ application.json
 big_seller.cookies
 conf/release_conf
 .ftp
+
+# UpSeller cookie 工具依赖
+tools/node_modules/
+tools/package-lock.json
