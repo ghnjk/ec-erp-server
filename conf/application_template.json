@@ -15,7 +15,7 @@
     "mail": "xxxx@xx.com",
     "password": "xxxx",
     "warehouse_id": 19482246679281859,
-    "chromedriver_path": "/Users/jkguo/.local/chromedriver/147.0.7727.117/chromedriver-mac-arm64/chromedriver"
+    "chromedriver_path": "/Users/jkguo/.local/chromedriver/149.0.7827.201/chromedriver-mac-arm64/chromedriver"
   },
   "big_seller_mail": "xxxx@xx.com",
   "big_seller_encoded_passwd": "xxxx",

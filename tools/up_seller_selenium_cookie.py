@@ -25,7 +25,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CHROME_DRIVER_PATH = (
-    "/Users/jkguo/.local/chromedriver/147.0.7727.117/"
+    "/Users/jkguo/.local/chromedriver/149.0.7827.201/"
     "chromedriver-mac-arm64/chromedriver"
 )
 DEFAULT_COOKIE_FILE = ROOT / "cookies" / "up_seller.cookies"

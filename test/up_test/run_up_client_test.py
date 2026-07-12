@@ -89,7 +89,7 @@ def main():
     report_path = report_dir / "up_seller_test_report.md"
     chrome_driver_path = os.environ.get(
         "UPSELLER_CHROMEDRIVER_PATH",
-        "/Users/jkguo/.local/chromedriver/147.0.7727.117/chromedriver-mac-arm64/chromedriver")
+        "/Users/jkguo/.local/chromedriver/149.0.7827.201/chromedriver-mac-arm64/chromedriver")
 
     _setup_stdout_logger()
     client = UpSellerClient(
