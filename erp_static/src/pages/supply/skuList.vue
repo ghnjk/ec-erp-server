@@ -77,10 +77,13 @@
           <template #pack_volume_m3="{ row }">
             {{ formatVolumeM3(rowPackVolumeM3(row)) }}
           </template>
+          <template #operation="{ row }">
+            <t-button size="small" theme="danger" variant="text" @click="popupDeleteSkuDialog(row)">删除</t-button>
+          </template>
         </t-table>
         <t-pagination
           v-model="paginationCurrentPage"
-          v-model:pageSize="paginationPageSize"
+          v-model:page-size="paginationPageSize"
           :page-size-options="paginationPageSizeOptions"
           :total="paginationTotalCount"
           class="pagination"
@@ -143,6 +146,42 @@
         </t-checkbox>
       </t-checkbox-group>
     </t-dialog>
+    <t-dialog
+      v-if="deleteSkuDialog.visible"
+      v-model:visible="deleteSkuDialog.visible"
+      :close-on-esc-keydown="false"
+      :close-on-overlay-click="false"
+      :confirm-btn="{
+        content: '确认删除',
+        theme: 'danger',
+        disabled: !isDeleteSkuConfirmed,
+        loading: deleteSkuDialog.loading,
+      }"
+      header="删除SKU"
+      show-overlay
+      width="520px"
+      @confirm="onDeleteSku"
+    >
+      <div class="delete-sku-info">
+        <t-image
+          :src="deleteSkuDialog.skuInfo?.erp_sku_image_url"
+          :style="{ width: '96px', height: '96px' }"
+          fit="cover"
+        />
+        <div class="delete-sku-detail">
+          <div><span>SKU：</span>{{ deleteSkuDialog.skuInfo?.sku }}</div>
+          <div><span>商品名：</span>{{ deleteSkuDialog.skuInfo?.sku_name || '--' }}</div>
+          <div><span>SKU分组：</span>{{ deleteSkuDialog.skuInfo?.sku_group || '--' }}</div>
+          <div><span>BigSeller商品名：</span>{{ deleteSkuDialog.skuInfo?.erp_sku_name || '--' }}</div>
+        </div>
+      </div>
+      <t-alert theme="error" message="删除后该 SKU 将从列表隐藏。重新添加同名 SKU 可恢复。" />
+      <t-form class="delete-sku-confirm-form">
+        <t-form-item :label="`请输入 ${deleteSkuDialog.skuInfo?.sku} 以确认删除`">
+          <t-input v-model="deleteSkuDialog.confirmSku" placeholder="请输入完整SKU" />
+        </t-form-item>
+      </t-form>
+    </t-dialog>
   </div>
 </template>
 
@@ -154,7 +193,7 @@ export default {
 <script lang="ts" setup>
 import { ref, computed, onMounted } from 'vue';
 import { MessagePlugin, InputNumber, Input, TableProps } from 'tdesign-vue-next';
-import { saveSku, searchSku, syncAllSku, addSku } from '@/apis/supplierApis';
+import { saveSku, searchSku, syncAllSku, addSku, deleteSku } from '@/apis/supplierApis';
 import { skuGroupNameOptions, loadSkuInfo, calcPackVolumeM3PerUnit, formatVolumeM3 } from '@/utils/skuUtil';
 
 // 列设置 localStorage key（v1：本期新增体积字段后默认列集合）
@@ -292,6 +331,7 @@ const allColumnDefs: Array<any> = [
     sortType: 'all',
     sorter: true,
   },
+  { width: 80, colKey: 'operation', fixed: 'right', title: '操作', align: 'center', required: true },
 ];
 
 // 默认显示的列（保持本次改动前的列集合 + 新增 3 个体积字段中的"打包体积(m³)" 汇总列；
@@ -343,7 +383,7 @@ const skuTableColumns = computed(() => {
 const rowPackVolumeM3 = (row: any) =>
   calcPackVolumeM3PerUnit(row.sku_pack_length, row.sku_pack_width, row.sku_pack_height);
 
-const skuTableData = ref([]);
+const skuTableData = ref<any[]>([]);
 const skuTableLoading = ref(false);
 const paginationCurrentPage = ref(1);
 const paginationTotalCount = ref(0);
@@ -353,6 +393,19 @@ const addSkuDialog = ref({
   visible: false,
   skus: '',
 });
+
+const deleteSkuDialog = ref({
+  visible: false,
+  loading: false,
+  confirmSku: '',
+  skuInfo: null as any,
+});
+
+const isDeleteSkuConfirmed = computed(
+  () =>
+    Boolean(deleteSkuDialog.value.skuInfo?.sku) &&
+    deleteSkuDialog.value.confirmSku === deleteSkuDialog.value.skuInfo.sku,
+);
 
 const columnSettingDialog = ref({
   visible: false,
@@ -398,12 +451,12 @@ const sortTableChange: TableProps['onSortChange'] = (val) => {
   sortTable.value = val;
   onSearchSku();
 };
-const onPaginationChange = ({ current, pageSize }) => {
+const onPaginationChange = ({ current, pageSize }: { current: number; pageSize: number }) => {
   paginationCurrentPage.value = current;
   paginationPageSize.value = pageSize;
   onSearchSku();
 };
-const calcAvgSellQuantityPkg = (row) => {
+const calcAvgSellQuantityPkg = (row: any) => {
   if (row.sku_unit_quantity === null || row.sku_unit_quantity === undefined || row.sku_unit_quantity <= 0) {
     return row.avg_sell_quantity.toFixed(1);
   }
@@ -413,7 +466,7 @@ const calcAvgSellQuantityPkg = (row) => {
   }
   return `${res.toFixed(1)} ${row.sku_unit_name.substring(0, 1)}`;
 };
-const calcInventoryPkg = (row) => {
+const calcInventoryPkg = (row: any) => {
   if (row.sku_unit_quantity === null || row.sku_unit_quantity === undefined || row.sku_unit_quantity <= 0) {
     return row.inventory.toFixed(1);
   }
@@ -423,7 +476,7 @@ const calcInventoryPkg = (row) => {
   }
   return `${res.toFixed(1)} ${row.sku_unit_name.substring(0, 1)}`;
 };
-const calcShippingStockQuantityPkg = (row) => {
+const calcShippingStockQuantityPkg = (row: any) => {
   if (row.sku_unit_quantity === null || row.sku_unit_quantity === undefined || row.sku_unit_quantity <= 0) {
     return row.shipping_stock_quantity.toFixed(1);
   }
@@ -433,7 +486,7 @@ const calcShippingStockQuantityPkg = (row) => {
   }
   return `${res.toFixed(1)} ${row.sku_unit_name.substring(0, 1)}`;
 };
-const calcShippingSupportDays = (row) => {
+const calcShippingSupportDays = (row: any) => {
   if (row.shipping_stock_quantity === 0) {
     return '0';
   }
@@ -443,7 +496,7 @@ const calcShippingSupportDays = (row) => {
   const supportDays = row.shipping_stock_quantity / row.avg_sell_quantity;
   return supportDays.toFixed(1);
 };
-const onSaveSku = async (sku) => {
+const onSaveSku = async (sku: any) => {
   try {
     await saveSku(sku);
     await MessagePlugin.success('更新sku成功。');
@@ -454,11 +507,16 @@ const onSaveSku = async (sku) => {
 };
 const onAddSku = async () => {
   try {
-    const { success_count, ignore_count, fail_count, detail } = await addSku({
+    const {
+      success_count: successCount,
+      ignore_count: ignoreCount,
+      fail_count: failCount,
+      detail,
+    } = await addSku({
       skus: addSkuDialog.value.skus,
     });
     console.log('onAddSku response', detail);
-    await MessagePlugin.success(`成功添加：${success_count}, 失败：${fail_count}， 忽略： ${ignore_count}`);
+    await MessagePlugin.success(`成功添加：${successCount}, 失败：${failCount}， 忽略： ${ignoreCount}`);
     onSearchSku();
   } catch (e) {
     console.error(e);
@@ -468,11 +526,34 @@ const onAddSku = async () => {
 const popupAddSkuDialog = () => {
   addSkuDialog.value.visible = true;
 };
+const popupDeleteSkuDialog = (skuInfo: any) => {
+  deleteSkuDialog.value = {
+    visible: true,
+    loading: false,
+    confirmSku: '',
+    skuInfo,
+  };
+};
+const onDeleteSku = async () => {
+  if (!isDeleteSkuConfirmed.value || deleteSkuDialog.value.loading) return;
+  deleteSkuDialog.value.loading = true;
+  try {
+    await deleteSku({ sku: deleteSkuDialog.value.skuInfo.sku });
+    deleteSkuDialog.value.visible = false;
+    await MessagePlugin.success('删除SKU成功。');
+    await onSearchSku();
+  } catch (e) {
+    console.error(e);
+    await MessagePlugin.error(`删除SKU异常: ${e}`);
+  } finally {
+    deleteSkuDialog.value.loading = false;
+  }
+};
 const onSyncAllSku = async () => {
   skuTableLoading.value = true;
   try {
-    const { update_count } = await syncAllSku();
-    await MessagePlugin.success(`成功同步${update_count}个sku`);
+    const { update_count: updateCount } = await syncAllSku();
+    await MessagePlugin.success(`成功同步${updateCount}个sku`);
   } catch (e) {
     console.error(e);
     await MessagePlugin.error(`查询sku异常: ${e}`);
@@ -502,4 +583,26 @@ const onSearchSku = async () => {
 };
 </script>
 
-<style lang="less" scoped></style>
+<style lang="less" scoped>
+.delete-sku-info {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.delete-sku-detail {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  line-height: 1.5;
+
+  span {
+    color: var(--td-text-color-secondary);
+  }
+}
+
+.delete-sku-confirm-form {
+  margin-top: 20px;
+}
+</style>

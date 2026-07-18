@@ -1,6 +1,10 @@
 import request from '@/utils/request';
 import { PageVO } from '@/apis/dto/common';
 
+export interface IDeleteSkuReq {
+  sku: string;
+}
+
 /**
  * 查询供应商信息
  * @param req
@@ -34,6 +38,9 @@ export const saveSku = (req: any) => {
 };
 export const addSku = (req: any) => {
   return request.post<any, any>('/erp_api/supplier/add_sku', req);
+};
+export const deleteSku = (req: IDeleteSkuReq) => {
+  return request.post<IDeleteSkuReq, Record<string, never>>('/erp_api/supplier/delete_sku', req);
 };
 export const syncAllSku = () => {
   return request.post<any, any>('/erp_api/supplier/sync_all_sku', {});

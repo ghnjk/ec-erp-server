@@ -9,7 +9,7 @@ Supplier 模块提供供应商管理、SKU 主数据管理、SKU 采购价格、
 - url_prefix：`/erp_api/supplier`
 - 权限：`PMS_SUPPLIER` (`"supply"`)，管理员放行
 
-## 接口清单（10 个）
+## 接口清单（11 个）
 
 每个接口的详细字段、示例与 Change-Log 见 [apis/design/supplier/](./apis/design/supplier/)。接口规约与变更管理流程见 [apis/spec.md](./apis/spec.md)。
 
@@ -19,6 +19,7 @@ Supplier 模块提供供应商管理、SKU 主数据管理、SKU 采购价格、
 | `/erp_api/supplier/search_sku` | `search_sku` | t_sku_info | [search_sku.md](./apis/design/supplier/search_sku.md) |
 | `/erp_api/supplier/save_sku` | `save_sku` | t_sku_info | [save_sku.md](./apis/design/supplier/save_sku.md) |
 | `/erp_api/supplier/add_sku` | `add_sku` | t_sku_info | [add_sku.md](./apis/design/supplier/add_sku.md) |
+| `/erp_api/supplier/delete_sku` | `delete_sku` | t_sku_info | [delete_sku.md](./apis/design/supplier/delete_sku.md) |
 | `/erp_api/supplier/sync_all_sku` | `sync_all_sku` | t_sku_info | [sync_all_sku.md](./apis/design/supplier/sync_all_sku.md) |
 | `/erp_api/supplier/search_sku_purchase_price` | `search_sku_purchase_price` | t_sku_purchase_price | [search_sku_purchase_price.md](./apis/design/supplier/search_sku_purchase_price.md) |
 | `/erp_api/supplier/query_sku_purchase_price` | `query_sku_purchase_price` | t_sku_purchase_price | [query_sku_purchase_price.md](./apis/design/supplier/query_sku_purchase_price.md) |
@@ -59,14 +60,39 @@ Supplier 模块提供供应商管理、SKU 主数据管理、SKU 采购价格、
 ### 4. `add_sku`
 
 - 参数：`skus` (string, 必填)：多行 SKU 文本
-- 业务：批量补充 SKU 主数据，对每个 sku 执行 ERP 查询并写入数据库
+- 业务：批量补充 SKU 主数据；有效同名 SKU 忽略，已逻辑删除的同名 SKU 刷新 ERP 信息并恢复
 - 返回：`pack_response({success_count, ignore_count, fail_count, detail})`
 
-### 5. `sync_all_sku`
+### 5. `delete_sku`
+
+- 参数：`sku` (string, 必填)
+- 业务：按当前项目和 SKU 逻辑删除，设置 `Fis_delete = 1`
+- 错误码：`1003` 参数为空，`1004` SKU 不存在或已删除
+- 返回：`pack_response({})`
+
+### 6. `sync_all_sku`
 
 - 参数：无
 - 业务：触发全量同步本地 SKU 主数据库（依赖 BigSellerClient + SkuManager）
 - 返回：`pack_response({update_count, fail_count})`
+
+## SKU 逻辑删除要求
+
+### Requirement: SKU 删除与查询隔离
+
+`delete_sku` SHALL 仅在当前项目内将有效 SKU 的 `Fis_delete` 设置为 1；`search_sku` SHALL 在分页总数和结果列表中排除所有已逻辑删除记录。
+
+#### Scenario: 删除后查询不可见
+- **WHEN** 用户成功删除当前项目中的 SKU 后调用 `search_sku`
+- **THEN** 该 SKU SHALL 不出现在结果列表或分页总数中。
+
+### Requirement: 批量添加可恢复已删除 SKU
+
+`add_sku` SHALL 忽略有效同名记录，但 SHALL 对已逻辑删除的同名记录重新同步卖家平台信息并写入 `Fis_delete = 0`。
+
+#### Scenario: 重新添加已删除 SKU
+- **WHEN** 已逻辑删除的 SKU 在卖家平台仍存在且被提交到 `add_sku`
+- **THEN** 该记录 SHALL 恢复为有效状态并计入成功数量。
 
 ## SKU 打包体积字段要求
 
@@ -120,19 +146,19 @@ Supplier 模块提供供应商管理、SKU 主数据管理、SKU 采购价格、
 
 受影响的 design 文档与业务文档 SHALL 同步更新体积字段说明：`openspec/specs/apis/design/supplier/save_sku.md`、`search_sku.md`、`add_sku.md`、`sync_all_sku.md`，以及 `docs/erp_api/supplier/save_sku.md`、`search_sku.md`。
 
-### 6. `search_sku_purchase_price`
+### 7. `search_sku_purchase_price`
 
 - 参数：`current_page` (int)，`page_size` (int)
 - 调用：`backend.search_sku_purchase_price(offset, page_size)`
 - 返回：`pack_pagination_result(total, list<SkuPurchasePriceDto>)`
 
-### 7. `query_sku_purchase_price`
+### 8. `query_sku_purchase_price`
 
 - 参数：`supplier_id` (int)，`sku` (string)
 - 业务：查询特定供应商的特定 SKU 单价（无记录则单价 0）
 - 返回：`pack_response({unit_price})`
 
-### 8. `search_purchase_order`
+### 9. `search_purchase_order`
 
 - 参数：
   - `order_type` (int, **必填**, 取值 1 或 2)
@@ -140,13 +166,13 @@ Supplier 模块提供供应商管理、SKU 主数据管理、SKU 采购价格、
 - 业务：分页查询采购单，按 `order_type` 过滤
 - 错误码：`1003` 参数非法
 
-### 9. `save_purchase_order`
+### 10. `save_purchase_order`
 
 - 参数：见下方 **采购单 Body 结构**
 - 业务：保存采购单（草稿态或当前步骤），不切换状态
 - 返回：`pack_response({})`
 
-### 10. `submit_purchase_order_and_next_step`
+### 11. `submit_purchase_order_and_next_step`
 
 - 参数：见下方 **采购单 Body 结构**
 - 业务：在保存基础上推进 `purchase_step` 状态机：

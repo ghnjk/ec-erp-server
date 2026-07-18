@@ -137,7 +137,8 @@ class SkuDto(DtoBase):
 | 方法 | 说明 |
 | ---- | ---- |
 | `store_sku(sku: SkuDto)` | upsert SKU（校验 `project_id == self.project_id`） |
-| `search_sku(sku_group, sku_name, sku, offset, limit, inventory_support_days=0, sort_types=None) -> (total, list)` | 多条件分页查询 |
+| `delete_sku(sku: str)` | 按当前项目和 SKU 逻辑删除（`Fis_delete = 1`） |
+| `search_sku(sku_group, sku_name, sku, offset, limit, inventory_support_days=0, sort_types=None) -> (total, list)` | 多条件分页查询，仅返回 `Fis_delete = 0` |
 | `get_sku(sku) -> Optional[SkuDto]` | 按 SKU 查询 |
 | `_get_sku(session, sku)` (静态) | 内部查询 |
 
@@ -154,6 +155,15 @@ class SkuDto(DtoBase):
 - [auto_sync_tools/sync_all_sku.py](../../../../auto_sync_tools/sync_all_sku.py)：同步本地 SKU 主数据 JSON
 
 ## Change-Log
+
+### 2026-07-19 - 增加 SKU 逻辑删除
+
+**变更类型**：CRUD 能力与查询约束调整，无表结构变化。
+
+**变更内容**：
+- 新增 `delete_sku(sku)`，设置 `Fis_delete=1` 并更新 `Fmodify_time`
+- `search_sku` 仅统计和返回 `Fis_delete=0` 的记录
+- `add_sku` 可将已删除的同名记录恢复为 `Fis_delete=0`
 
 ### 2026-04-30 - 新增打包体积字段（长 / 宽 / 高，cm）
 

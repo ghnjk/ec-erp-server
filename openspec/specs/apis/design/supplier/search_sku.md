@@ -137,7 +137,7 @@
 
 1. 权限校验
 2. 解析查询条件（空字符串转 `None`，由 `request_util.get_str_param(..., erase_empty_str=True)` 实现）
-3. 调用 `backend.search_sku(sku_group, sku_name, sku, offset, page_size, inventory_support_days, sort_types)`
+3. 调用 `backend.search_sku(...)`，限定当前项目且 `is_delete = 0`
 4. 返回 `pack_pagination_result(total, records)`
 
 ## 关联
@@ -151,9 +151,17 @@
 - 所有字符串条件支持模糊匹配
 - 空字符串等同未传
 - `inventory_support_days = 库存 / 平均日销量`，**该字段不会实时计算，需要 `sync_all_sku` 后才更新**
-- 接口自动按 project_id 过滤
+- 接口自动按 `project_id` 过滤，并排除已逻辑删除的 SKU
 
 ## Change-Log
+
+### 2026-07-19 - 过滤已逻辑删除 SKU
+
+**变更类型**：查询约束增强（兼容）。
+
+**变更内容**：
+- Backend 基础查询增加 `SkuDto.is_delete == 0`
+- `data.total` 与 `data.list` 均不包含逻辑删除记录
 
 ### 2026-04-30 - 响应新增打包体积字段（长 / 宽 / 高，cm）
 

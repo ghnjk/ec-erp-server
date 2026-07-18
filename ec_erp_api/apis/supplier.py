@@ -77,6 +77,23 @@ def delete_supplier():
     return response_util.pack_response({})
 
 
+@supplier_apis.route('/delete_sku', methods=["POST"])
+@api_post_request()
+def delete_sku():
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
+    sku = request_util.get_str_param("sku")
+    sku = sku.strip() if sku is not None else ""
+    if not sku:
+        return response_util.pack_error_response(1003, "sku不能为空")
+    backend = request_context.get_backend()
+    existing_sku = backend.get_sku(sku)
+    if existing_sku is None or existing_sku.is_delete == 1:
+        return response_util.pack_error_response(1004, f"SKU不存在: {sku}")
+    backend.delete_sku(sku)
+    return response_util.pack_response({})
+
+
 @supplier_apis.route('/search_sku', methods=["POST"])
 @api_post_request()
 def search_sku():
@@ -149,7 +166,8 @@ def save_sku():
         sku_pack_height=sku_pack_height,
         avg_sell_quantity=avg_sell_quantity,
         inventory_support_days=inventory_support_days,
-        shipping_stock_quantity=shipping_stock_quantity
+        shipping_stock_quantity=shipping_stock_quantity,
+        is_delete=0
     )
     request_context.get_backend().store_sku(s)
     return response_util.pack_response(DtoUtil.to_dict(s))
@@ -173,7 +191,8 @@ def add_sku():
             continue
         sku = line
         # 检测数据库中是否有该sku
-        if backend.get_sku(sku) is not None:
+        existing_sku = backend.get_sku(sku)
+        if existing_sku is not None and existing_sku.is_delete == 0:
             op_detail[sku] = "ignored"
             ignore_count += 1
             continue
@@ -216,7 +235,8 @@ def add_sku():
             sku_pack_height=0,
             avg_sell_quantity=avg_sell_quantity,
             inventory_support_days=inventory_support_days,
-            shipping_stock_quantity=shipping_stock_quantity
+            shipping_stock_quantity=shipping_stock_quantity,
+            is_delete=0
         )
         request_context.get_backend().store_sku(s)
         success_count += 1

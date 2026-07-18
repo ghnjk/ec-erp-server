@@ -19,6 +19,10 @@ const apiList = [
     method: 'post',
   },
   {
+    url: '/erp_api/supplier/delete_sku',
+    method: 'post',
+  },
+  {
     url: '/erp_api/supplier/search_sku_purchase_price',
     method: 'post',
   },

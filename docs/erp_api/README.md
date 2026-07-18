@@ -71,6 +71,7 @@
 | [搜索SKU](./supplier/search_sku.md) | `/erp_api/supplier/search_sku` | 搜索SKU商品列表，支持多条件和排序 |
 | [保存SKU](./supplier/save_sku.md) | `/erp_api/supplier/save_sku` | 保存或更新SKU信息 |
 | [批量添加SKU](./supplier/add_sku.md) | `/erp_api/supplier/add_sku` | 批量添加SKU，自动同步BigSeller数据 |
+| [删除SKU](./supplier/delete_sku.md) | `/erp_api/supplier/delete_sku` | 按SKU逻辑删除商品主数据 |
 | [同步所有SKU](./supplier/sync_all_sku.md) | `/erp_api/supplier/sync_all_sku` | 同步所有SKU的库存和销量信息 |
 
 #### 采购价格管理

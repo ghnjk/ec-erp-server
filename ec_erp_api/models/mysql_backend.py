@@ -751,12 +751,35 @@ class MysqlBackend(object):
                          f"  failed: {e}")
             raise
 
+    def delete_sku(self, sku: str):
+        """
+        逻辑删除SKU
+        """
+        session = self.DBSession()
+        try:
+            db_dto = self._get_sku(session, sku)
+            if db_dto is None or db_dto.is_delete == 1:
+                raise Exception(f"SKU不存在: {sku}")
+            db_dto.is_delete = 1
+            db_dto.modify_time = datetime.now()
+            session.add(db_dto)
+            session.commit()
+            session.close()
+        except Exception as e:
+            session.rollback()
+            session.close()
+            logger.error(f"delete sku {sku} failed: {e}")
+            raise
+
     def search_sku(self,
                    sku_group, sku_name, sku,
                    offset: int, limit: int, inventory_support_days: int = 0,
                    sort_types: typing.Optional[dict] = None) -> typing.Tuple[int, typing.List[SkuDto]]:
         session = self.DBSession()
-        q = session.query(SkuDto).filter(SkuDto.project_id == self.project_id)
+        q = session.query(SkuDto).filter(
+            SkuDto.project_id == self.project_id,
+            SkuDto.is_delete == 0
+        )
         if sku_group is not None:
             q = q.filter(SkuDto.sku_group == sku_group)
         if sku_name is not None:
