@@ -11,7 +11,9 @@ import typing
 from datetime import datetime
 
 import sqlalchemy
-from sqlalchemy import create_engine, String, Boolean, JSON, Integer, Float, DateTime, sql, Column, PrimaryKeyConstraint
+from sqlalchemy import (
+    create_engine, String, Boolean, JSON, Integer, Float, DateTime, sql, Column, PrimaryKeyConstraint, or_
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import sessionmaker
@@ -776,9 +778,10 @@ class MysqlBackend(object):
                    offset: int, limit: int, inventory_support_days: int = 0,
                    sort_types: typing.Optional[dict] = None) -> typing.Tuple[int, typing.List[SkuDto]]:
         session = self.DBSession()
+        # 存量数据 Fis_delete 可能为 NULL，与 0 同等视为未删除
         q = session.query(SkuDto).filter(
             SkuDto.project_id == self.project_id,
-            SkuDto.is_delete == 0
+            or_(SkuDto.is_delete == 0, SkuDto.is_delete.is_(None))
         )
         if sku_group is not None:
             q = q.filter(SkuDto.sku_group == sku_group)

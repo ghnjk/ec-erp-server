@@ -80,7 +80,7 @@ Supplier 模块提供供应商管理、SKU 主数据管理、SKU 采购价格、
 
 ### Requirement: SKU 删除与查询隔离
 
-`delete_sku` SHALL 仅在当前项目内将有效 SKU 的 `Fis_delete` 设置为 1；`search_sku` SHALL 在分页总数和结果列表中排除所有已逻辑删除记录。
+`delete_sku` SHALL 仅在当前项目内将有效 SKU 的 `Fis_delete` 设置为 1；`search_sku` SHALL 在分页总数和结果列表中排除所有已逻辑删除记录。存量数据中 `Fis_delete IS NULL` SHALL 与 `0` 同等视为未删除。
 
 #### Scenario: 删除后查询不可见
 - **WHEN** 用户成功删除当前项目中的 SKU 后调用 `search_sku`

@@ -16,7 +16,7 @@ Supplier 模块 SHALL 提供 `POST /erp_api/supplier/delete_sku`，接收非空�
 - **THEN** 接口返回不存在错误 1004
 
 ### Requirement: Supplier SKU 查询过滤逻辑删除记录
-`search_sku` SHALL 在所有筛选、排序和分页场景中先限定当前项目且 `is_delete = 0`。
+`search_sku` SHALL 在所有筛选、排序和分页场景中先限定当前项目且未删除（`is_delete = 0` 或 `is_delete IS NULL`）。
 
 #### Scenario: 分页总数排除已删除记录
 - **WHEN** 调用 `search_sku` 查询含有逻辑删除记录的数据集

@@ -12,7 +12,7 @@
 - **THEN** 系统返回对应参数、权限或不存在错误且不修改数据
 
 ### Requirement: 已删除 SKU 不出现在列表
-SKU 分页查询 SHALL 仅返回当前项目中 `Fis_delete = 0` 的记录。
+SKU 分页查询 SHALL 仅返回当前项目中未删除的记录（`Fis_delete = 0` 或 `Fis_delete IS NULL`）。
 
 #### Scenario: 查询包含已删除 SKU 的项目
 - **WHEN** 当前项目同时存在有效和已逻辑删除的 SKU

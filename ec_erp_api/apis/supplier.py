@@ -192,7 +192,8 @@ def add_sku():
         sku = line
         # 检测数据库中是否有该sku
         existing_sku = backend.get_sku(sku)
-        if existing_sku is not None and existing_sku.is_delete == 0:
+        # is_delete 为 NULL/0 均视为有效；仅 == 1 才走恢复流程
+        if existing_sku is not None and existing_sku.is_delete != 1:
             op_detail[sku] = "ignored"
             ignore_count += 1
             continue
