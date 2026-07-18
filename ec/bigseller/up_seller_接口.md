@@ -246,7 +246,29 @@ python tools/up_seller_cookie.py \
 }
 ```
 
-入库保存的字段需要以后用真实页面提交再补齐；当前 `UpSellerClient.add_stock_to_erp(req)` 保持透传，方便用抓包确认后的请求体直接调用。
+入库保存请求体（前端 `getAddData` / 实战抓包确认）：
+
+```json
+{
+  "warehouseId": "仓库ID",
+  "inoutClass": "other",
+  "note": "备注",
+  "trackingNumber": "可选运单号",
+  "details": [
+    {
+      "skuId": "SKU ID",
+      "sku": "SKU编码",
+      "qty": 1,
+      "costPrice": 0,
+      "shelfNumber": null,
+      "isNewShelfNumber": 0
+    }
+  ]
+}
+```
+
+注意：数量字段是 `qty`，不是 BigSeller 的 `stockQty`；缺少 `inoutClass` 或误用 `stockQty` 时接口会返回 `{"code":-1,"msg":"Error.Error_failed"}`。
+`UpSellerClient.add_stock_to_erp(req)` 仍保持透传，由 `UpSellerAdapter` 组装正确字段。
 
 ## 4. Python Client 对应方法
 

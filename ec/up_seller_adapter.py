@@ -13,9 +13,10 @@ UpSeller 平台的 SellerClient 适配实现。
 - /api/warehouse-sku/list：库存行字段 skuId/sku/skuTitle/imgUrl/onhand/allocated/available
   ⚠ 没有 avgDailySales 字段，UpSeller 当前未在该接口暴露日销均量
 
-注意：UpSeller 的入库 (/api/warehouse-inout-list/add-in) 和出库 (/api/warehouse-inout-list/add-out)
-请求体字段在探测阶段未做真实写入测试，本适配器按文档字段名 + BigSeller 对应字段语义构造
-请求体；首次实战入库时若 UpSeller 返回字段错误需要根据真实响应再调整。
+入/出库请求体已按前端 getAddData 抓包确认：
+- 顶层必填 inoutClass（手动入库默认 other）
+- details 数量字段为 qty（不是 BigSeller 的 stockQty）
+- details 含 skuId/sku；入库可带 costPrice、shelfNumber、isNewShelfNumber
 """
 import logging
 import typing
@@ -121,25 +122,30 @@ class UpSellerAdapter(SellerClient):
             raw=raw,
         )
 
-    def _build_inout_details(self, items: List[StockMoveItem]) -> typing.List[dict]:
+    def _build_inout_details(
+            self,
+            items: List[StockMoveItem],
+            with_cost_price: bool = False) -> typing.List[dict]:
         details = []
         for it in items:
             entry = {
                 "skuId": str(it.erp_sku_id),
                 "sku": it.sku,
-                "warehouseId": str(self._warehouse_id),
-                "stockQty": int(it.quantity),
+                "qty": int(it.quantity),
+                "isNewShelfNumber": 0,
             }
-            if it.unit_price_yuan is not None:
+            if with_cost_price and it.unit_price_yuan is not None:
                 entry["costPrice"] = float(it.unit_price_yuan)
             details.append(entry)
         return details
 
     def add_stock_in(self, items: List[StockMoveItem], note: str) -> StockResult:
+        # 对齐前端 /zh-CN/inventory/add-inbound-order 的 getAddData 结构
         payload = {
             "warehouseId": str(self._warehouse_id),
-            "note": note,
-            "details": self._build_inout_details(items),
+            "inoutClass": "other",
+            "note": note or "",
+            "details": self._build_inout_details(items, with_cost_price=True),
         }
         raw = self._client.add_stock_to_erp(payload)
         return self._extract_stock_result(raw, total=len(items))
@@ -147,8 +153,9 @@ class UpSellerAdapter(SellerClient):
     def add_stock_out(self, items: List[StockMoveItem], note: str) -> StockResult:
         payload = {
             "warehouseId": str(self._warehouse_id),
-            "note": note,
-            "details": self._build_inout_details(items),
+            "inoutClass": "other",
+            "note": note or "",
+            "details": self._build_inout_details(items, with_cost_price=False),
         }
         raw = self._client.out_stock_from_erp(payload)
         return self._extract_stock_result(raw, total=len(items))
