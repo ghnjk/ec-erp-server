@@ -175,12 +175,13 @@
           <div><span>BigSeller商品名：</span>{{ deleteSkuDialog.skuInfo?.erp_sku_name || '--' }}</div>
         </div>
       </div>
-      <t-alert theme="error" message="删除后该 SKU 将从列表隐藏。重新添加同名 SKU 可恢复。" />
-      <t-form class="delete-sku-confirm-form">
-        <t-form-item :label="`请输入 ${deleteSkuDialog.skuInfo?.sku} 以确认删除`">
-          <t-input v-model="deleteSkuDialog.confirmSku" placeholder="请输入完整SKU" />
-        </t-form-item>
-      </t-form>
+      <t-alert theme="error" message="删除后该 SKU 后，不可恢复。请谨慎操作。" />
+      <div class="delete-sku-confirm-form">
+        <div class="delete-sku-confirm-label">
+          请输入 <code>{{ deleteSkuDialog.skuInfo?.sku }}</code> 以确认删除
+        </div>
+        <t-input v-model="deleteSkuDialog.confirmSku" placeholder="请输入完整SKU" />
+      </div>
     </t-dialog>
   </div>
 </template>
@@ -196,8 +197,8 @@ import { MessagePlugin, InputNumber, Input, TableProps } from 'tdesign-vue-next'
 import { saveSku, searchSku, syncAllSku, addSku, deleteSku } from '@/apis/supplierApis';
 import { skuGroupNameOptions, loadSkuInfo, calcPackVolumeM3PerUnit, formatVolumeM3 } from '@/utils/skuUtil';
 
-// 列设置 localStorage key（v1：本期新增体积字段后默认列集合）
-const COL_VISIBILITY_STORAGE_KEY = 'sku_list_visible_cols_v1';
+// 列设置 localStorage key（v2：新增必显「操作」列）
+const COL_VISIBILITY_STORAGE_KEY = 'sku_list_visible_cols_v2';
 
 const queryParam = ref({
   skuGroup: '',
@@ -353,30 +354,35 @@ const DEFAULT_VISIBLE_COL_KEYS: string[] = [
   'shipping_stock_quantity',
   'shipping_stock_quantity_pkg',
   'shipping_stock_support_days',
+  'operation',
 ];
 
 const REQUIRED_COL_KEYS: string[] = allColumnDefs.filter((c) => c.required).map((c) => c.colKey);
 
+const withRequiredColKeys = (keys: string[]): string[] => {
+  const set = new Set<string>(keys);
+  REQUIRED_COL_KEYS.forEach((k) => set.add(k));
+  // 保持 allColumnDefs 顺序，避免操作列跑到中间
+  return allColumnDefs.map((c) => c.colKey).filter((k) => set.has(k));
+};
+
 const loadVisibleColKeys = (): string[] => {
   try {
     const raw = localStorage.getItem(COL_VISIBILITY_STORAGE_KEY);
-    if (!raw) return [...DEFAULT_VISIBLE_COL_KEYS];
+    if (!raw) return withRequiredColKeys(DEFAULT_VISIBLE_COL_KEYS);
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [...DEFAULT_VISIBLE_COL_KEYS];
-    // 必显列兜底
-    const set = new Set<string>(parsed);
-    REQUIRED_COL_KEYS.forEach((k) => set.add(k));
-    return Array.from(set);
+    if (!Array.isArray(parsed)) return withRequiredColKeys(DEFAULT_VISIBLE_COL_KEYS);
+    return withRequiredColKeys(parsed);
   } catch (e) {
     console.warn('loadVisibleColKeys failed', e);
-    return [...DEFAULT_VISIBLE_COL_KEYS];
+    return withRequiredColKeys(DEFAULT_VISIBLE_COL_KEYS);
   }
 };
 
 const visibleColKeys = ref<string[]>(loadVisibleColKeys());
 
 const skuTableColumns = computed(() => {
-  const keep = new Set(visibleColKeys.value);
+  const keep = new Set(withRequiredColKeys(visibleColKeys.value));
   return allColumnDefs.filter((c) => keep.has(c.colKey));
 });
 
@@ -413,7 +419,7 @@ const columnSettingDialog = ref({
 });
 
 const popupColumnSettingDialog = () => {
-  columnSettingDialog.value.selectedKeys = [...visibleColKeys.value];
+  columnSettingDialog.value.selectedKeys = withRequiredColKeys(visibleColKeys.value);
   columnSettingDialog.value.visible = true;
 };
 
@@ -423,18 +429,15 @@ const onSelectAllCols = () => {
 
 const onClearAllCols = () => {
   // 必显列保留
-  columnSettingDialog.value.selectedKeys = [...REQUIRED_COL_KEYS];
+  columnSettingDialog.value.selectedKeys = withRequiredColKeys([]);
 };
 
 const onResetCols = () => {
-  columnSettingDialog.value.selectedKeys = [...DEFAULT_VISIBLE_COL_KEYS];
+  columnSettingDialog.value.selectedKeys = withRequiredColKeys(DEFAULT_VISIBLE_COL_KEYS);
 };
 
 const onConfirmColumnSetting = () => {
-  // 必显列兜底
-  const set = new Set<string>(columnSettingDialog.value.selectedKeys);
-  REQUIRED_COL_KEYS.forEach((k) => set.add(k));
-  visibleColKeys.value = Array.from(set);
+  visibleColKeys.value = withRequiredColKeys(columnSettingDialog.value.selectedKeys);
   try {
     localStorage.setItem(COL_VISIBILITY_STORAGE_KEY, JSON.stringify(visibleColKeys.value));
   } catch (e) {
@@ -604,5 +607,21 @@ const onSearchSku = async () => {
 
 .delete-sku-confirm-form {
   margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.delete-sku-confirm-label {
+  line-height: 1.5;
+  word-break: break-all;
+  color: var(--td-text-color-primary);
+
+  code {
+    padding: 0 4px;
+    color: var(--td-error-color);
+    background: var(--td-error-color-1);
+    border-radius: 3px;
+  }
 }
 </style>
