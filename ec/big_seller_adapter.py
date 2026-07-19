@@ -143,3 +143,7 @@ class BigSellerAdapter(SellerClient):
 
     def refresh_local_sku_cache(self) -> None:
         self._sku_manager.load_and_update_all_sku(self._client)
+
+    def load_sku_avg_daily_sales(self, begin_date, end_date):
+        # BigSeller 继续使用库存接口直接返回的 avgDailySales。
+        return None

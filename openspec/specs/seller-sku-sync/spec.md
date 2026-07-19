@@ -92,33 +92,53 @@ def refresh_local_sku_cache(self) -> None: ...
 - **AND** `erp_sku_name` SHALL 取 UpSeller `query_sku_detail.title`，为空时回落 `query_sku_inventory_detail.skuTitle`
 - **AND** 脚本完整执行不抛异常。
 
-### Requirement: UpSeller 缺失日销均量时不得覆盖历史 avg_sell_quantity
+### Requirement: UpSeller 必须按 14 个完整自然日统计单 SKU 日均销量
 
-当 `InventoryDetail.avg_daily_sales == 0` 时（典型出现在 UpSeller 项目，BigSeller 真实零销也属于此分支），`sync_sku_inventory.py` SHALL：
+`SellerClient.load_sku_avg_daily_sales(begin_date, end_date)` SHALL：
 
-- **不**赋值 `sku_info.avg_sell_quantity`，保留数据库已有值；
-- 计算 `sku_info.inventory_support_days`：
-  - 若数据库已有 `sku_info.avg_sell_quantity > 0.01`：`int(sku_info.inventory / sku_info.avg_sell_quantity)`；
-  - 否则按零销兜底：`sku_info.inventory / 0.01`（保持与 BigSeller 老分支等价行为）。
+- BigSeller 返回 `None`，继续使用 `InventoryDetail.avg_daily_sales`；
+- UpSeller 返回指定 `[begin_date, end_date)` 的单 SKU 日均销量字典；
+- `sync_sku_inventory.py` SHALL 传入 `[today-17天, today-3天)`，排除最近 3 个完整自然日并固定使用 14 天作分母；
+- UpSeller 区间完整加载成功时，未出现在字典中的 SKU SHALL 视为真实零销量并覆盖历史值；
+- 任一天加载失败时 SHALL 返回失败，由脚本打印一次告警、继续库存同步并保留历史均量。
 
-当 `InventoryDetail.avg_daily_sales > 0` 时（典型 BigSeller 路径），`sync_sku_inventory.py` SHALL：
+UpSeller 每日原始变种销量 SHALL 原子缓存到
+`{cookies_dir}/up_seller_sales/YYYY-MM-DD.json`。已有有效缓存不得重复请求上游；损坏或版本
+不兼容的缓存可以重新抓取，但只有完整抓取成功后才能替换目标文件。
 
-- 赋值 `sku_info.avg_sell_quantity = round(avg_daily_sales * 1.1, 2)`；
-- 按上面的同一公式重算 `sku_info.inventory_support_days`。
+#### Scenario: UpSeller 组合 SKU 拆分后计算均量
+- **GIVEN** 平台变种 SKU 映射到组合 SKU `GROUP`，且 `groupVOS` 包含 `SINGLE × 6`
+- **AND** 14 天内 `GROUP` 售出 2 件
+- **WHEN** 加载区间日均销量
+- **THEN** `SINGLE` 的累计销量 SHALL 为 12
+- **AND** 日均销量 SHALL 为 `12 / 14`。
 
-#### Scenario: UpSeller 不破坏运营维护的 avg
-- **GIVEN** 数据库中某 SKU `avg_sell_quantity = 5.5`、`inventory = 100`
-- **AND** UpSeller 返回 `avg_daily_sales = 0`
+#### Scenario: UpSeller 完整区间内真实零销量
+- **GIVEN** 14 个日期缓存均完整
+- **AND** 数据库某 SKU 未出现在任何销售记录中
 - **WHEN** 执行 `sync_sku_inventory.py`
-- **THEN** 数据库中该 SKU `avg_sell_quantity` SHALL 仍为 5.5
-- **AND** `inventory_support_days` SHALL 等于 `int(100 / 5.5) = 18`。
+- **THEN** 该 SKU `avg_sell_quantity` SHALL 更新为 0
+- **AND** `inventory_support_days` SHALL 按 `inventory / 0.01` 计算。
 
-#### Scenario: UpSeller 数据库无历史 avg
-- **GIVEN** 数据库中某 SKU `avg_sell_quantity = 0`、`inventory = 100`
-- **AND** UpSeller 返回 `avg_daily_sales = 0`
+#### Scenario: UpSeller 销量接口失败时保留历史均量
+- **GIVEN** 数据库中某 SKU `avg_sell_quantity = 5.5`
+- **AND** 14 天中任一天销量抓取失败
 - **WHEN** 执行 `sync_sku_inventory.py`
-- **THEN** 数据库中该 SKU `avg_sell_quantity` SHALL 仍为 0
-- **AND** `inventory_support_days` SHALL 等于 `100 / 0.01 = 10000`（与 BigSeller 老逻辑等价）。
+- **THEN** 库存同步 SHALL 继续
+- **AND** 该 SKU `avg_sell_quantity` SHALL 仍为 5.5。
+
+### Requirement: UpSeller 销售变种必须精确映射并拆为最终单 SKU
+
+平台销售行 SHALL 按以下优先级映射内部 SKU：
+
+1. `(shopId, platform, variationId)` 匹配 `relationVos.platformVariantsId`；
+2. `(shopId, platform, variationSku)` 匹配 `relationVos.platformSku`；
+3. `variationSku` 精确匹配 `all_up_seller_sku.json` 的 SKU 键。
+
+系统 SHALL NOT 使用模糊 SKU 匹配。组合 SKU SHALL 根据 `groupVOS[].varSku/num` 递归拆分，
+并检测循环、缺失子 SKU、空组合明细及无效数量；无法映射或拆分的销售行 SHALL 记录告警并跳过。
+若区间内存在销量但全部销售行都无法映射，统计 SHALL 失败并触发保留历史均量的降级路径，
+不得把所有 SKU 错误清零。
 
 #### Scenario: BigSeller 真实日销
 - **GIVEN** 数据库中某 SKU `avg_sell_quantity = 5.5`、`inventory = 100`

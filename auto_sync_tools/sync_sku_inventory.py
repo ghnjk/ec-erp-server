@@ -6,8 +6,8 @@
 @create: 2024/3/8
 
 同步策略：仅显式更新 inventory / erp_sku_* / inventory_support_days / shipping_stock_quantity；
-当上游 ERP 提供 avg_daily_sales > 0 时同步 avg_sell_quantity；为 0（典型 UpSeller 路径，
-或 BigSeller 真无销量）则保留数据库已有值，不破坏运营人工维护的均量。
+UpSeller 使用排除最近 3 天后的前 14 天本地销量缓存计算均量；BigSeller 继续使用库存接口
+提供的 avg_daily_sales。UpSeller 销量加载失败或 BigSeller 均量为 0 时保留数据库已有值。
 sku_pack_length / sku_pack_width / sku_pack_height 等手工维护字段保留旧值
 （依赖复用既有 ORM 实例，未显式覆盖的字段不会变化）。
 ERP 类型由 application.json:use_up_seller 决定，由 seller_util.build_seller_client() 统一路由。
@@ -23,20 +23,22 @@ from ec_erp_api.common.big_seller_util import build_backend, MysqlBackend
 from ec_erp_api.common.seller_util import build_seller_client
 
 
-def load_and_calc_sku_avg_sell_quantity(backend, sku: str) -> float:
-    now = time.time()
-    day_sec = 24 * 3600
-    end_ti = now - 3 * day_sec
-    begin_ti = end_ti - 14 * day_sec
-    begin_date = datetime.datetime.fromtimestamp(begin_ti)
-    end_date = datetime.datetime.fromtimestamp(end_ti)
-    all_sale_quantity = 0
-    for item in backend.search_sku_sale_estimate(begin_date, end_date, sku):
-        all_sale_quantity += item.efficient_quantity
-    print(f"load_and_calc_sku_avg_sell_quantity sku {sku} begin_date {begin_date.strftime('%Y-%m-%d')} "
-          f"end_date {end_date.strftime('%Y-%m-%d')} "
-          f"avg_sale_quantity: {all_sale_quantity / 14.0}")
-    return all_sale_quantity / 14.0
+def load_sku_avg_daily_sales(seller):
+    end_date = datetime.date.today() - datetime.timedelta(days=3)
+    begin_date = end_date - datetime.timedelta(days=14)
+    try:
+        avg_sales = seller.load_sku_avg_daily_sales(begin_date, end_date)
+        if avg_sales is not None:
+            print(
+                f"load upseller sku avg daily sales {begin_date} ~ {end_date}, "
+                f"sku_count: {len(avg_sales)}")
+        return avg_sales
+    except Exception as e:
+        # 销量统计失败不阻断库存同步；返回 None 表示保留数据库历史均量。
+        print(
+            f"load sku avg daily sales {begin_date} ~ {end_date} failed, "
+            f"keep history avg: {e}")
+        return None
 
 
 def load_all_shipping_sku_info(backend: MysqlBackend):
@@ -60,6 +62,7 @@ def sync_sku_inventory():
     project_id = config.get("sync_tool_project_id", "philipine")
     backend = build_backend(project_id)
     seller = build_seller_client()
+    avg_daily_sales_map = load_sku_avg_daily_sales(seller)
     shipping_sku_map = load_all_shipping_sku_info(backend)
     _, sku_list = backend.search_sku(sku_group=None, sku_name=None, sku=None, offset=0, limit=10000)
     for sku_info in sku_list:
@@ -70,8 +73,12 @@ def sync_sku_inventory():
             sku_info.erp_sku_id = sku_detail.erp_sku_id
             sku_info.erp_sku_name = sku_detail.title or inv_detail.title
             sku_info.erp_sku_image_url = sku_detail.image_url or inv_detail.image_url
-            # avg_daily_sales > 0 时按上游均量刷新；为 0 则保留 DB 历史值（UpSeller 当前不暴露该字段）
-            if inv_detail.avg_daily_sales > 0:
+            if avg_daily_sales_map is not None:
+                # UpSeller 区间数据完整时，缓存中未出现的 SKU 是真实零销量。
+                sku_info.avg_sell_quantity = round(
+                    avg_daily_sales_map.get(sku_info.sku, 0.0) * 1.1, 2)
+            elif inv_detail.avg_daily_sales > 0:
+                # BigSeller 保持现有 avgDailySales 行为；真实零销仍保留历史值。
                 sku_info.avg_sell_quantity = round(inv_detail.avg_daily_sales * 1.1, 2)
             if sku_info.avg_sell_quantity and sku_info.avg_sell_quantity > 0.01:
                 sku_info.inventory_support_days = int(sku_info.inventory / sku_info.avg_sell_quantity)

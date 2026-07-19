@@ -270,7 +270,59 @@ python tools/up_seller_cookie.py \
 注意：数量字段是 `qty`，不是 BigSeller 的 `stockQty`；缺少 `inoutClass` 或误用 `stockQty` 时接口会返回 `{"code":-1,"msg":"Error.Error_failed"}`。
 `UpSellerClient.add_stock_to_erp(req)` 仍保持透传，由 `UpSellerAdapter` 组装正确字段。
 
-## 4. Python Client 对应方法
+## 4. 商品销售统计
+
+前端页面：`GET /zh-CN/analytics/product-sales`。
+
+### 按产品分页
+
+- URL：`POST /api/statistics/product-sale-all-list`
+- Content-Type：`application/x-www-form-urlencoded`
+- 请求参数：
+
+```json
+{
+  "beginDate": "2026-07-18",
+  "endDate": "2026-07-18",
+  "dateType": 0,
+  "sortName": 0,
+  "sortValue": 0,
+  "pageNum": 1,
+  "pageSize": 200
+}
+```
+
+响应 `data` 使用 PageHelper 分页结构，关键字段为 `pages / total / list`。
+产品行关键字段：`shopId / platform / productId / productSku / unitsSold`。
+
+### 按产品查询变种销量
+
+- URL：`GET /api/statistics/variation-sale-all-list`
+- 在产品分页参数基础上增加：
+
+```json
+{
+  "shopIdList": "953938",
+  "searchType": 0,
+  "searchValue": "1736050752355206356",
+  "detailProductId": "1736050752355206356",
+  "detailProductSku": ""
+}
+```
+
+变种行关键字段：
+
+- `variationId`：平台变种 ID；
+- `variationSku`：平台变种 SKU；
+- `productSales`：该变种售出数量；
+- `shopId / platform / productId`：映射上下文。
+
+`UpSellerClient.load_sku_sales_by_date()` 先遍历产品分页，再遍历每个产品的变种分页，
+返回适合按日缓存的精简记录。调用方应优先使用 `all_up_seller_sku.json` 中
+`relationVos.platformVariantsId` 映射内部 SKU，再使用 `platformSku`，最后才允许 SKU
+精确匹配；组合 SKU 根据 `groupVOS[].varSku/num` 递归拆为单 SKU。
+
+## 5. Python Client 对应方法
 
 - `login(email, password)`：优先复用 cookie；无 cookie 时识别图片验证码，并使用默认 `build_default_login_body_encoder()`（AES-256-ECB/PKCS7+Base64）完成前端 `body` 加密；CN 场景仍需注入 TencentCaptcha token/randStr。
 - `is_login()`：调用 `/api/is-login`。
@@ -282,4 +334,7 @@ python tools/up_seller_cookie.py \
 - `query_sku_inventory_page()`：库存列表通用查询。
 - `query_sku_inventory_detail()`：按 SKU + 仓库查库存行。
 - `query_product_warehouse_list()`：查 SKU 仓库库存分布。
+- `query_product_sale_page()`：按日分页查询有销量的产品。
+- `query_variation_sale_page()`：按店铺、产品查询变种销量。
+- `load_sku_sales_by_date()`：加载一天全部变种销量。
 - `add_stock_to_erp()` / `out_stock_from_erp()`：入库/出库请求体透传。

@@ -146,6 +146,8 @@ class UpSellerClient:
         self.add_stock_url = f"{self.base_url}/api/warehouse-inout-list/add-in"
         self.add_stock_examine_url = f"{self.base_url}/api/warehouse-inout-list/add-in-to-examine"
         self.out_stock_url = f"{self.base_url}/api/warehouse-inout-list/add-out"
+        self.product_sale_list_url = f"{self.base_url}/api/statistics/product-sale-all-list"
+        self.variation_sale_list_url = f"{self.base_url}/api/statistics/variation-sale-all-list"
 
         self.session = requests.Session()
         self.auto_verify_coder = YdmVerify(ydm_token)
@@ -748,6 +750,99 @@ class UpSellerClient:
         self._check_response(res, "query_product_warehouse_list")
         return res.get("data")
 
+    def query_product_sale_page(
+            self,
+            sale_date: str,
+            page_no: int = 1,
+            page_size: int = 200):
+        """按自然日分页查询有销量的平台产品。"""
+        req = {
+            "beginDate": sale_date,
+            "endDate": sale_date,
+            "dateType": 0,
+            "sortName": 0,
+            "sortValue": 0,
+            "pageNum": page_no,
+            "pageSize": page_size,
+        }
+        res = self.post_form(self.product_sale_list_url, data=req).json()
+        self._check_response(res, "query_product_sale_page")
+        return self._extract_page(res.get("data"))
+
+    def query_variation_sale_page(
+            self,
+            sale_date: str,
+            shop_id: typing.Union[int, str],
+            product_id: typing.Union[int, str],
+            product_sku: str = "",
+            page_no: int = 1,
+            page_size: int = 200):
+        """查询某店铺产品在指定自然日的变种销量。"""
+        req = {
+            "beginDate": sale_date,
+            "endDate": sale_date,
+            "dateType": 0,
+            "sortName": 0,
+            "sortValue": 0,
+            "pageNum": page_no,
+            "pageSize": page_size,
+            "shopIdList": str(shop_id),
+            "searchType": 0,
+            "searchValue": str(product_id),
+            "detailProductId": str(product_id),
+            "detailProductSku": product_sku or "",
+        }
+        res = self.get(self.variation_sale_list_url, params=req).json()
+        self._check_response(res, "query_variation_sale_page")
+        return self._extract_page(res.get("data"))
+
+    def load_sku_sales_by_date(
+            self,
+            sale_date: str,
+            page_size: int = 200,
+            request_interval: float = 0.1) -> typing.List[dict]:
+        """加载一天的全部变种销量，返回适合本地缓存的精简记录。"""
+        result = []
+        product_page_no = 1
+        while True:
+            product_page = self.query_product_sale_page(
+                sale_date=sale_date,
+                page_no=product_page_no,
+                page_size=page_size)
+            for product in product_page["rows"]:
+                variation_page_no = 1
+                while True:
+                    variation_page = self.query_variation_sale_page(
+                        sale_date=sale_date,
+                        shop_id=product.get("shopId"),
+                        product_id=product.get("productId"),
+                        product_sku=product.get("productSku") or "",
+                        page_no=variation_page_no,
+                        page_size=page_size)
+                    for row in variation_page["rows"]:
+                        result.append({
+                            "date": sale_date,
+                            "shopId": row.get("shopId") or product.get("shopId"),
+                            "platform": row.get("platform") or product.get("platform"),
+                            "productId": row.get("productId") or product.get("productId"),
+                            "variationId": row.get("variationId"),
+                            "variationSku": row.get("variationSku") or "",
+                            "productSales": int(row.get("productSales") or 0),
+                        })
+                    if variation_page_no >= variation_page["total_page"]:
+                        break
+                    variation_page_no += 1
+                    if request_interval > 0:
+                        time.sleep(request_interval)
+                if request_interval > 0:
+                    time.sleep(request_interval)
+            if product_page_no >= product_page["total_page"]:
+                break
+            product_page_no += 1
+            if request_interval > 0:
+                time.sleep(request_interval)
+        return result
+
     def add_stock_to_erp(self, req: dict, submit_to_examine: bool = False):
         url = self.add_stock_examine_url if submit_to_examine else self.add_stock_url
         res = self.post(url, json=req).json()
@@ -826,7 +921,7 @@ class UpSellerClient:
         page_no = data.get("pageNum") or data.get("pageNo") or data.get("current") or 1
         page_size = data.get("pageSize") or data.get("size") or len(rows)
         total_size = data.get("total") or data.get("totalSize") or len(rows)
-        total_page = data.get("totalPage")
+        total_page = data.get("totalPage") or data.get("pages")
         if not total_page:
             total_page = max((total_size + page_size - 1) // page_size, 1) if page_size else 1
         return {

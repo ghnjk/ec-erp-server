@@ -30,6 +30,7 @@ from ec.seller_client import (
     StockMoveItem,
     StockResult,
 )
+from ec.up_seller_sales_manager import UpSellerSalesManager
 from ec.upseller_sku_manager import UpSellerSkuManager
 
 
@@ -41,9 +42,11 @@ class UpSellerAdapter(SellerClient):
             sku_manager: UpSellerSkuManager,
             email: str,
             password: str,
-            warehouse_id: int):
+            warehouse_id: int,
+            sales_manager: Optional[UpSellerSalesManager] = None):
         self._client = client
         self._sku_manager = sku_manager
+        self._sales_manager = sales_manager
         self._email = email
         self._password = password
         self._warehouse_id = int(warehouse_id)
@@ -162,6 +165,11 @@ class UpSellerAdapter(SellerClient):
 
     def refresh_local_sku_cache(self) -> None:
         self._sku_manager.load_and_update_all_sku(self._client)
+
+    def load_sku_avg_daily_sales(self, begin_date, end_date):
+        if self._sales_manager is None:
+            return None
+        return self._sales_manager.load_avg_daily_sales(begin_date, end_date)
 
     @staticmethod
     def _extract_stock_result(raw, total: int) -> StockResult:

@@ -94,20 +94,23 @@
 - 流程：
   1. `build_backend(config.get("sync_tool_project_id", "philipine"))` 获取后端
   2. `build_seller_client()` 获取统一 `SellerClient`（自动选 BigSeller / UpSeller）
-  3. `load_all_shipping_sku_info(backend)` 加载在途 SKU
-  4. `backend.search_sku(...)` 批量
-  5. 每条 SKU：
+  3. 调用 `seller.load_sku_avg_daily_sales(today-17天, today-3天)`；UpSeller 返回 14 天本地统计，BigSeller 返回 `None`
+  4. `load_all_shipping_sku_info(backend)` 加载在途 SKU
+  5. `backend.search_sku(...)` 批量
+  6. 每条 SKU：
      - `seller.query_sku_detail(sku)` → `SkuDetail.inventory_in_warehouse / erp_sku_id / title / image_url`
      - `seller.query_sku_inventory_detail(sku)` → `InventoryDetail.avg_daily_sales / title / image_url`
      - 字段映射回 `t_sku_info`：`inventory / erp_sku_id / erp_sku_name / erp_sku_image_url`
-     - 销量与库存支撑天数：`avg_daily_sales > 0` 时按 `round(avg * 1.1, 2)` 刷新；为 0 则保留 DB 已有 `avg_sell_quantity`（典型 UpSeller，或 BigSeller 真无销量）
+     - UpSeller 本地统计成功时按 `round(avg_map.get(sku, 0) * 1.1, 2)` 刷新，未出现 SKU 视为真实零销量
+     - BigSeller 仍在 `avg_daily_sales > 0` 时按 `round(avg * 1.1, 2)` 刷新；为 0 则保留 DB 已有值
      - `inventory_support_days = int(inventory / avg_sell_quantity)`（avg 有效）或 `inventory / 0.01`（零销兜底）
-  6. `backend.store_sku(sku_dto)` 落库
-  7. 单条异常 `print` 后 `continue`，不中断整体任务
-  8. `time.sleep(0.3)` 节流
+  7. `backend.store_sku(sku_dto)` 落库
+  8. 单条异常 `print` 后 `continue`，不中断整体任务
+  9. `time.sleep(0.3)` 节流
 - 同步目标：MySQL `t_sku_info`
 - 多 project：通过 `sync_tool_project_id` 切换，单次仍处理一个 project
-- UpSeller 兜底：`InventoryDetail.avg_daily_sales` 当前固定为 0（UpSeller `/api/warehouse-sku/list` 不暴露），脚本保留 DB 历史 `avg_sell_quantity`，避免清零
+- UpSeller 销量缓存：`{cookies_dir}/up_seller_sales/YYYY-MM-DD.json` 按日保存原始变种销量；排除最近 3 天并取此前 14 天计算均量
+- UpSeller 兜底：任一天抓取失败时本轮不使用本地统计，继续同步库存并保留 DB 历史 `avg_sell_quantity`
 - 体积字段：脚本不修改 `Fsku_pack_length / Fsku_pack_width / Fsku_pack_height`（与 `add-sku-pack-volume` 约束一致，复用 ORM 实例自动保留）
 - 日志：`print`
 

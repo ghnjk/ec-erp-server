@@ -11,7 +11,7 @@
 字段命名遵循 ERP 内部语义而非任何一家平台原始字段。
 """
 from dataclasses import dataclass, field
-from typing import List, Optional, Protocol
+from typing import Dict, List, Optional, Protocol
 
 
 @dataclass
@@ -90,5 +90,16 @@ class SellerClient(Protocol):
         与 ``auto_sync_tools/sync_all_sku.py`` 配合使用：定时任务通过本方法
         刷新本地 SKU 缓存，无需在脚本中区分上游平台。如果上游接口失败，
         实现应抛异常而不是静默忽略。
+        """
+        ...
+
+    def load_sku_avg_daily_sales(
+            self,
+            begin_date,
+            end_date) -> Optional[Dict[str, float]]:
+        """加载指定自然日区间的本地 SKU 日均销量。
+
+        返回 ``None`` 表示当前 ERP 继续使用 ``InventoryDetail.avg_daily_sales``；
+        返回字典（允许为空）表示区间统计完整，未出现的 SKU 视为真实零销量。
         """
         ...

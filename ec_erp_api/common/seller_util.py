@@ -28,6 +28,7 @@ from ec.bigseller.up_seller_client import UpSellerClient
 from ec.seller_client import SellerClient
 from ec.sku_manager import SkuManager
 from ec.up_seller_adapter import UpSellerAdapter
+from ec.up_seller_sales_manager import UpSellerSalesManager
 from ec.upseller_sku_manager import UpSellerSkuManager
 from ec_erp_api.app_config import get_app_config
 from ec_erp_api.common.singleton import CachedSingletonInstanceHolder
@@ -159,12 +160,18 @@ def _build_up_seller_adapter() -> UpSellerAdapter:
         local_db_path=os.path.join(cookies_dir, "all_up_seller_sku.json")
     )
     sku_manager.load()
+    sales_manager = UpSellerSalesManager(
+        client=client,
+        sku_manager=sku_manager,
+        cache_dir=os.path.join(cookies_dir, "up_seller_sales"),
+    )
     return UpSellerAdapter(
         client=client,
         sku_manager=sku_manager,
         email=up_cfg["mail"],
         password=up_cfg["password"],
         warehouse_id=int(up_cfg["warehouse_id"]),
+        sales_manager=sales_manager,
     )
 
 
