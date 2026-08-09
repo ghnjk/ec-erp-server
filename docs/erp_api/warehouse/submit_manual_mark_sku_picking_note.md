@@ -13,11 +13,11 @@
 |--------|------|------|------|
 | manual_mark_sku_list | array | 是 | SKU拣货备注列表 |
 | ∟ sku | string | 是 | SKU编码 |
-| ∟ picking_unit | float | 是 | 拣货单位数量 |
+| ∟ picking_unit | float | 是 | 拣货单位数量，最小值为0.01 |
 | ∟ picking_unit_name | string | 是 | 拣货单位名称 |
 | ∟ picking_sku_name | string | 是 | 拣货SKU名称 |
 | ∟ support_pkg_picking | bool | 否 | 是否支持整包拣货，默认false |
-| ∟ pkg_picking_unit | float | 否 | 整包拣货单位数量，默认0 |
+| ∟ pkg_picking_unit | float | 否 | 整包拣货单位数量；启用整包拣货时最小值为0.01，未启用时可为0 |
 | ∟ pkg_picking_unit_name | string | 否 | 整包拣货单位名称，默认空字符串 |
 
 ## 响应参数
@@ -34,6 +34,7 @@
 
 | 错误码 | 说明 |
 |--------|------|
+| 1003 | 拣货单位数量格式错误或小于允许的最小值 |
 | 1008 | 权限不足 |
 
 ## 请求示例
@@ -133,6 +134,8 @@
 ### 基础拣货单位（必填）
 表示ERP系统中的1个SKU对应实际多少个商品。
 
+`picking_unit` 必须是有效数字，且不能小于0.01。
+
 **示例1**：
 - ERP中"葡萄叶1片"对应实际10片葡萄叶
 - picking_unit = 10
@@ -145,6 +148,9 @@
 
 ### 整包拣货单位（可选）
 当商品可以按整包/整箱拣货时配置。
+
+当 `support_pkg_picking = true` 时，`pkg_picking_unit` 必须是有效数字，且不能小于0.01；
+未启用整包拣货时允许使用0作为占位值。
 
 **示例**：
 - 基础单位：10片/个

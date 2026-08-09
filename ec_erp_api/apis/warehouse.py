@@ -5,7 +5,9 @@
 @author: jkguo
 @create: 2024/10/3
 """
+import math
 import time
+
 from ec_erp_api.common.api_core import api_post_request
 from ec_erp_api.common import request_util, response_util, request_context, big_seller_util
 from flask import (
@@ -437,13 +439,32 @@ def submit_manual_mark_sku_picking_note():
     manual_mark_sku_list = request_util.get_param("manual_mark_sku_list")
     backend = request_context.get_backend()
     for item in manual_mark_sku_list:
+        sku = item.get("sku", "")
+        support_pkg_picking = item.get("support_pkg_picking", False)
+        try:
+            picking_unit = float(item["picking_unit"])
+        except (KeyError, TypeError, ValueError):
+            return response_util.pack_error_response(1003, f"sku [{sku}] 拣货单位数量必须是数字")
+        try:
+            pkg_picking_unit = float(item.get("pkg_picking_unit", 0))
+        except (TypeError, ValueError):
+            return response_util.pack_error_response(1003, f"sku [{sku}] PKG打包单位数量必须是数字")
+        if not math.isfinite(picking_unit) or picking_unit < 0.01:
+            return response_util.pack_error_response(1003, f"sku [{sku}] 拣货单位数量不能小于0.01")
+        if not math.isfinite(pkg_picking_unit):
+            return response_util.pack_error_response(1003, f"sku [{sku}] PKG打包单位数量必须是数字")
+        if support_pkg_picking and pkg_picking_unit < 0.01:
+            return response_util.pack_error_response(1003, f"sku [{sku}] PKG打包单位数量不能小于0.01")
+        if not support_pkg_picking and pkg_picking_unit < 0:
+            return response_util.pack_error_response(1003, f"sku [{sku}] PKG打包单位数量不能小于0")
+
         note = SkuPickingNote()
         note.project_id = request_context.get_current_project_id()
-        note.sku = item["sku"]
-        note.picking_unit = float(item["picking_unit"])
+        note.sku = sku
+        note.picking_unit = picking_unit
         note.picking_unit_name = item["picking_unit_name"]
-        note.support_pkg_picking = item.get("support_pkg_picking", False)
-        note.pkg_picking_unit = float(item["pkg_picking_unit"])
+        note.support_pkg_picking = support_pkg_picking
+        note.pkg_picking_unit = pkg_picking_unit
         note.pkg_picking_unit_name = item["pkg_picking_unit_name"]
         if note.support_pkg_picking and note.picking_unit > note.pkg_picking_unit:
             temp_unit = note.pkg_picking_unit

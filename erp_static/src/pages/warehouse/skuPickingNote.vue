@@ -68,7 +68,8 @@
         <t-form-item label="拣货单位数量" name="picking_unit">
           <t-input-number 
             v-model="addFormData.picking_unit" 
-            :min="1"
+            :min="MIN_PICKING_UNIT"
+            :step="MIN_PICKING_UNIT"
             placeholder="请输入1拣货单位=多少sku"
           />
         </t-form-item>
@@ -100,7 +101,8 @@
         >
           <t-input-number 
             v-model="addFormData.pkg_picking_unit" 
-            :min="1"
+            :min="MIN_PICKING_UNIT"
+            :step="MIN_PICKING_UNIT"
             placeholder="请输入1 PKG=多少SKU"
           />
         </t-form-item>
@@ -128,6 +130,8 @@ import { ref, onMounted } from 'vue';
 import { InputNumber, Select, Input, MessagePlugin, Dialog, Form, FormItem, Button } from 'tdesign-vue-next';
 import { savePurchaseOrder, searchPurchaseOrder } from '@/apis/supplierApis';
 import { searchManualMarkSkuPickingNote, submitManualMarkSkuPickingNote } from '@/apis/warehouseApis';
+
+const MIN_PICKING_UNIT = 0.01;
 
 const noteTableColumns = [
   {
@@ -160,6 +164,8 @@ const noteTableColumns = [
       // props, 透传全部属性到 Input 组件。可以是一个函数，不同行有不同的 props 属性 时，使用 Function）
       props: {
         autofocus: true,
+        min: MIN_PICKING_UNIT,
+        step: MIN_PICKING_UNIT,
       },
       // 触发校验的时机（when to validate)
       validateTrigger: 'change',
@@ -296,6 +302,8 @@ const noteTableColumns = [
       // props, 透传全部属性到 Input 组件。可以是一个函数，不同行有不同的 props 属性 时，使用 Function）
       props: {
         autofocus: true,
+        min: MIN_PICKING_UNIT,
+        step: MIN_PICKING_UNIT,
       },
       // 触发校验的时机（when to validate)
       validateTrigger: 'change',
@@ -404,8 +412,17 @@ const onSearchPickingNote = async () => {
 };
 const onSavePickingNote = async (pickingNote) => {
   let isValid = true;
-  if (pickingNote.picking_unit <= 0) {
-    MessagePlugin.info(`${pickingNote.sku} picking_unit 未填`);
+  const pickingUnit = Number(pickingNote.picking_unit);
+  if (!Number.isFinite(pickingUnit) || pickingUnit < MIN_PICKING_UNIT) {
+    MessagePlugin.info(`${pickingNote.sku} 拣货单位数量不能小于 ${MIN_PICKING_UNIT}`);
+    isValid = false;
+  }
+  const pkgPickingUnit = Number(pickingNote.pkg_picking_unit);
+  if (
+    pickingNote.support_pkg_picking &&
+    (!Number.isFinite(pkgPickingUnit) || pkgPickingUnit < MIN_PICKING_UNIT)
+  ) {
+    MessagePlugin.info(`${pickingNote.sku} PKG打包单位数量不能小于 ${MIN_PICKING_UNIT}`);
     isValid = false;
   }
   if (pickingNote.picking_unit_name === '') {
