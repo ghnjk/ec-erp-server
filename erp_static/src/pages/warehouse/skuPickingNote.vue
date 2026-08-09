@@ -70,6 +70,8 @@
             v-model="addFormData.picking_unit" 
             :min="MIN_PICKING_UNIT"
             :step="MIN_PICKING_UNIT"
+            :decimal-places="PICKING_UNIT_DECIMAL_PLACES"
+            large-number
             placeholder="请输入1拣货单位=多少sku"
           />
         </t-form-item>
@@ -103,6 +105,8 @@
             v-model="addFormData.pkg_picking_unit" 
             :min="MIN_PICKING_UNIT"
             :step="MIN_PICKING_UNIT"
+            :decimal-places="PICKING_UNIT_DECIMAL_PLACES"
+            large-number
             placeholder="请输入1 PKG=多少SKU"
           />
         </t-form-item>
@@ -132,6 +136,7 @@ import { savePurchaseOrder, searchPurchaseOrder } from '@/apis/supplierApis';
 import { searchManualMarkSkuPickingNote, submitManualMarkSkuPickingNote } from '@/apis/warehouseApis';
 
 const MIN_PICKING_UNIT = 0.01;
+const PICKING_UNIT_DECIMAL_PLACES = 2;
 
 const noteTableColumns = [
   {
@@ -166,6 +171,9 @@ const noteTableColumns = [
         autofocus: true,
         min: MIN_PICKING_UNIT,
         step: MIN_PICKING_UNIT,
+        decimalPlaces: PICKING_UNIT_DECIMAL_PLACES,
+        // TDesign 0.24.9 的 number 模式会把输入中的 0.0 立即转换为 0，导致无法继续输入 0.01。
+        largeNumber: true,
       },
       // 触发校验的时机（when to validate)
       validateTrigger: 'change',
@@ -304,6 +312,8 @@ const noteTableColumns = [
         autofocus: true,
         min: MIN_PICKING_UNIT,
         step: MIN_PICKING_UNIT,
+        decimalPlaces: PICKING_UNIT_DECIMAL_PLACES,
+        largeNumber: true,
       },
       // 触发校验的时机（when to validate)
       validateTrigger: 'change',
