@@ -1,0 +1,2 @@
+import{_ as e,b as s,c as a}from"./index.dcb3317c.js";const r={name:"SkuSale"},o={src:"http://150.109.158.22:3000/d/f5b488b9-3325-4119-92c8-2e46bb95ebbd/skue99480-e594ae-e68aa5-e8a1a8?orgId=1&from=now-30d&to=now&kiosk",style:{width:"100%",height:"100vh"}};function t(c,n,_,p,d,i){return s(),a("iframe",o,`
+  `)}var k=e(r,[["render",t],["__file","/Users/jkguo/workspace/ec-erp-server/erp_static/src/pages/dashboard/skuSale.vue"]]);export{k as default};
