@@ -148,8 +148,10 @@ Supplier 模块提供供应商管理、SKU 主数据管理、SKU 采购价格、
 
 ### 7. `search_sku_purchase_price`
 
-- 参数：`current_page` (int)，`page_size` (int)
-- 调用：`backend.search_sku_purchase_price(offset, page_size)`
+- 可选筛选参数：`supplier_name`、`sku_group`、`sku_name`、`sku`
+- 分页参数：`current_page` (int)，`page_size` (int)
+- 匹配规则：供应商名称、商品名称、商品 SKU 包含匹配，SKU 分组精确匹配
+- 调用：`backend.search_sku_purchase_price(supplier_name, sku_group, sku_name, sku, offset, page_size)`
 - 返回：`pack_pagination_result(total, list<SkuPurchasePriceDto>)`
 
 ### 8. `query_sku_purchase_price`

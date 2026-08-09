@@ -1,0 +1,40 @@
+{
+  "data": {
+    "total": 2,
+    "list": [
+      {
+        "project_id": "philipine",
+        "sku": "A-11-Beige Reed leaf",
+        "supplier_id": 4,
+        "supplier_name": "新草地厂家(麦森人造草坪）",
+        "purchase_price": 30,
+        "sku_group": "藤条/芦苇叶",
+        "sku_name": "米色芦苇叶",
+        "erp_sku_image_url": "https://example.com/images/a-11-beige.jpg",
+        "is_delete": 0,
+        "version": 0,
+        "modify_user": "",
+        "create_time": "2024-03-02 21:51:42",
+        "modify_time": "2024-03-02 21:51:42"
+      },
+      {
+        "project_id": "philipine",
+        "sku": "A-11-Blue Reed leaf",
+        "supplier_id": 4,
+        "supplier_name": "新草地厂家(麦森人造草坪）",
+        "purchase_price": 30,
+        "sku_group": "藤条/芦苇叶",
+        "sku_name": "蓝色芦苇叶",
+        "erp_sku_image_url": "https://example.com/images/a-11-blue.jpg",
+        "is_delete": 0,
+        "version": 0,
+        "modify_user": "",
+        "create_time": "2024-03-02 21:51:42",
+        "modify_time": "2024-03-02 21:51:42"
+      }
+    ]
+  },
+  "result": 0,
+  "resultMsg": "success",
+  "traceId": 1780000000003
+}

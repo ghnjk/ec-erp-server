@@ -1,6 +1,35 @@
 <template>
   <div>
     <t-card>
+      <t-row>
+        <t-col :span="12">
+          <t-form layout="inline">
+            <t-form-item label="供应商:" name="supplierName">
+              <t-input v-model="queryParam.supplierName" placeholder="供应商" />
+            </t-form-item>
+            <t-form-item label="sku分组:" name="skuGroup">
+              <t-select
+                v-model="queryParam.skuGroup"
+                :options="skuGroupNameOptions"
+                clearable
+                filterable
+                placeholder="-请选择商品分组-"
+                style="width: 150px; display: inline-block"
+              />
+            </t-form-item>
+            <t-form-item label="商品名:" name="skuName">
+              <t-input v-model="queryParam.skuName" placeholder="商品名" />
+            </t-form-item>
+            <t-form-item label="商品SKU:" name="sku">
+              <t-input v-model="queryParam.sku" placeholder="商品SKU" />
+            </t-form-item>
+            <t-form-item>
+              <t-button theme="primary" @click="onQuery">查询</t-button>
+            </t-form-item>
+          </t-form>
+        </t-col>
+      </t-row>
+      <br />
       <div class="table-container">
         <t-table
           :columns="skuTableColumns"
@@ -20,7 +49,7 @@
         </t-table>
         <t-pagination
           v-model="paginationCurrentPage"
-          v-model:pageSize="paginationPageSize"
+          v-model:page-size="paginationPageSize"
           :page-size-options="paginationPageSizeOptions"
           :total="paginationTotalCount"
           class="pagination"
@@ -40,6 +69,14 @@ export default {
 import { ref, onMounted } from 'vue';
 import { MessagePlugin } from 'tdesign-vue-next';
 import { searchSkuPurchasePrice } from '@/apis/supplierApis';
+import { loadSkuInfo, skuGroupNameOptions } from '@/utils/skuUtil';
+
+const queryParam = ref({
+  supplierName: '',
+  skuGroup: '',
+  skuName: '',
+  sku: '',
+});
 
 const skuTableColumns = [
   {
@@ -88,15 +125,24 @@ const paginationPageSizeOptions = [10, 20, 50, 100];
 
 onMounted(() => {
   onSearchSku();
+  loadSkuInfo();
 });
 
-const onPaginationChange = ({ current, pageSize }) => {
+const onQuery = () => {
+  paginationCurrentPage.value = 1;
+  onSearchSku();
+};
+const onPaginationChange = ({ current, pageSize }: { current: number; pageSize: number }) => {
   paginationCurrentPage.value = current;
   paginationPageSize.value = pageSize;
   onSearchSku();
 };
 const onSearchSku = async () => {
   const req = {
+    supplier_name: queryParam.value.supplierName,
+    sku_group: queryParam.value.skuGroup,
+    sku_name: queryParam.value.skuName,
+    sku: queryParam.value.sku,
     current_page: paginationCurrentPage.value,
     page_size: paginationPageSize.value,
   };

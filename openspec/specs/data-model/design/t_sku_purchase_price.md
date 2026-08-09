@@ -99,7 +99,7 @@ class SkuPurchasePriceDto(DtoBase):
 | 方法 | 说明 |
 | ---- | ---- |
 | `store_sku_purchase_price(...)` | upsert |
-| `search_sku_purchase_price(offset, limit) -> (total, list)` | 分页查询 |
+| `search_sku_purchase_price(supplier_name, sku_group, sku_name, sku, offset, limit) -> (total, list)` | 按供应商名称、SKU 分组、商品名、商品 SKU 筛选并分页查询 |
 | `get_sku_purchase_price(supplier_id, sku) -> Optional[SkuPurchasePriceDto]` | 三元组查询 |
 
 ## 关联表 / 模块

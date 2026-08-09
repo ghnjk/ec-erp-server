@@ -295,12 +295,25 @@ def sync_all_sku():
 def search_sku_purchase_price():
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
+    supplier_name = request_util.get_str_param("supplier_name")
+    supplier_name = supplier_name.strip() if supplier_name is not None else None
+    supplier_name = supplier_name or None
+    sku_group = request_util.get_str_param("sku_group")
+    sku_group = sku_group.strip() if sku_group is not None else None
+    sku_group = sku_group or None
+    sku_name = request_util.get_str_param("sku_name")
+    sku_name = sku_name.strip() if sku_name is not None else None
+    sku_name = sku_name or None
+    sku = request_util.get_str_param("sku")
+    sku = sku.strip() if sku is not None else None
+    sku = sku or None
     current_page = request_util.get_int_param("current_page")
     page_size = request_util.get_int_param("page_size")
     offset = (current_page - 1) * page_size
     if offset < 0:
         offset = 0
-    total, records = request_context.get_backend().search_sku_purchase_price(offset, page_size)
+    total, records = request_context.get_backend().search_sku_purchase_price(
+        supplier_name, sku_group, sku_name, sku, offset, page_size)
     return response_util.pack_pagination_result(total, records)
 
 

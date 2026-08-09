@@ -8,6 +8,7 @@ erp_static/mock/api/data/erp_api/*
 !erp_static/mock/api/data/erp_api/supplier/
 erp_static/mock/api/data/erp_api/supplier/*
 !erp_static/mock/api/data/erp_api/supplier/delete_sku.json
+!erp_static/mock/api/data/erp_api/supplier/search_sku_purchase_price.json
 .DS_Store
 *.py[cod]
 *$py.class

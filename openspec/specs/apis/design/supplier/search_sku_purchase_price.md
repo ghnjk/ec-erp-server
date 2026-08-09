@@ -12,6 +12,10 @@
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
+| supplier_name | string | 否 | 供应商名称，包含匹配 |
+| sku_group | string | 否 | SKU 分组，精确匹配 |
+| sku_name | string | 否 | 商品名称，包含匹配 |
+| sku | string | 否 | 商品 SKU，包含匹配 |
 | current_page | int | 是 | 当前页码 |
 | page_size | int | 是 | 每页记录数 |
 
@@ -40,7 +44,16 @@
 ## 请求示例
 
 ```json
-{ "body": { "current_page": 1, "page_size": 10 } }
+{
+  "body": {
+    "supplier_name": "新草地",
+    "sku_group": "藤条/芦苇叶",
+    "sku_name": "芦苇叶",
+    "sku": "A-11",
+    "current_page": 1,
+    "page_size": 10
+  }
+}
 ```
 
 ## 响应示例
@@ -76,8 +89,11 @@
 ## 业务逻辑说明
 
 1. 权限校验
-2. 调用 `backend.search_sku_purchase_price(offset, page_size)`
-3. 返回 `pack_pagination_result`
+2. 规范化四个可选筛选参数，空字符串不参与过滤
+3. 按当前项目 ID 和未删除状态过滤数据
+4. 供应商名称、商品名称、商品 SKU 使用包含匹配，SKU 分组使用精确匹配
+5. 调用 `backend.search_sku_purchase_price(supplier_name, sku_group, sku_name, sku, offset, page_size)`
+6. 返回 `pack_pagination_result`
 
 ## 关联
 
@@ -88,10 +104,17 @@
 ## 注意事项
 
 - 价格单位：**分**（前端展示需 / 100）
+- 筛选后的记录总数用于分页 `total`
 - 同一 SKU 可能多供应商各有价格记录
 - 价格在采购单 `供应商捡货中 → 待发货` 时自动更新
 
 ## Change-Log
+
+### 增加采购价分页筛选
+
+**变更类型**：增强接口
+
+**变更原因**：支持采购价页面按供应商、SKU 分组、商品名和商品 SKU 分页检索。
 
 ### 初始版本 - 搜索 SKU 采购价格接口
 

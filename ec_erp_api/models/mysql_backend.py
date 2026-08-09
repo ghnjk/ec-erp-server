@@ -848,10 +848,22 @@ class MysqlBackend(object):
                          f"  failed: {e}")
             raise
 
-    def search_sku_purchase_price(self, offset, limit) -> typing.Tuple[int, typing.List[SkuPurchasePriceDto]]:
+    def search_sku_purchase_price(self, supplier_name, sku_group, sku_name, sku,
+                                  offset, limit) -> typing.Tuple[int, typing.List[SkuPurchasePriceDto]]:
         session = self.DBSession()
-        q = session.query(SkuPurchasePriceDto).filter(SkuPurchasePriceDto.project_id == self.project_id).order_by(
-            SkuPurchasePriceDto.sku.asc())
+        q = session.query(SkuPurchasePriceDto).filter(
+            SkuPurchasePriceDto.project_id == self.project_id,
+            or_(SkuPurchasePriceDto.is_delete == 0, SkuPurchasePriceDto.is_delete.is_(None))
+        )
+        if supplier_name is not None:
+            q = q.filter(SkuPurchasePriceDto.supplier_name.like(f"%{supplier_name}%"))
+        if sku_group is not None:
+            q = q.filter(SkuPurchasePriceDto.sku_group == sku_group)
+        if sku_name is not None:
+            q = q.filter(SkuPurchasePriceDto.sku_name.like(f"%{sku_name}%"))
+        if sku is not None:
+            q = q.filter(SkuPurchasePriceDto.sku.like(f"%{sku}%"))
+        q = q.order_by(SkuPurchasePriceDto.sku.asc())
         total = q.count()
         q = q.offset(offset).limit(limit)
         records = q.all()
