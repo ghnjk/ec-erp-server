@@ -71,6 +71,57 @@ class DailyClient:
         return self.rows_by_date.get(sale_date, [])
 
 
+class JsonResponse:
+
+    def __init__(self, body):
+        self.body = body
+
+    def json(self):
+        return self.body
+
+
+class RelationPagingClient:
+    query_sku_relation_detail = UpSellerClient.query_sku_relation_detail
+    _check_response = staticmethod(UpSellerClient._check_response)
+    _extract_page = staticmethod(UpSellerClient._extract_page)
+    sku_relation_detail_url = "https://example.test/api/sku/sku-relation-detail"
+
+    def __init__(self):
+        self.calls = []
+
+    def get(self, url, params):
+        page_no = params["pageNum"]
+        self.calls.append(page_no)
+        return JsonResponse({
+            "code": 0,
+            "data": {
+                "list": [{"platformVariantsId": "v" + str(page_no)}],
+                "pageNum": page_no,
+                "pageSize": 1,
+                "total": 2,
+                "pages": 2,
+            },
+        })
+
+
+class SkuSyncClient:
+
+    def __init__(self, rows, relations):
+        self.rows = rows
+        self.relations = relations
+        self.relation_calls = []
+
+    def load_all_sku(self, include_variants=False):
+        return [dict(row) for row in self.rows]
+
+    def query_sku_detail(self, sku_id, sku_type):
+        raise AssertionError("unexpected query_sku_detail")
+
+    def query_sku_relation_detail(self, sku_id):
+        self.relation_calls.append(str(sku_id))
+        return list(self.relations[str(sku_id)])
+
+
 class UpSellerSalesTest(unittest.TestCase):
 
     @staticmethod
@@ -117,6 +168,75 @@ class UpSellerSalesTest(unittest.TestCase):
             "pages": 3,
         })
         self.assertEqual(3, page["total_page"])
+
+    def test_client_loads_all_sku_relation_pages(self):
+        client = RelationPagingClient()
+        rows = client.query_sku_relation_detail("sku-1", page_size=1)
+        self.assertEqual([1, 2], client.calls)
+        self.assertEqual(["v1", "v2"], [
+            row["platformVariantsId"] for row in rows])
+
+    def test_sku_sync_refreshes_incomplete_relation_vos(self):
+        row = {
+            "idStr": "single-1",
+            "sku": "SINGLE",
+            "isGroup": 0,
+            "mappingStatus": True,
+            "relationCount": 2,
+            "relationVos": None,
+        }
+        complete_relations = [{
+            "shopId": 953938,
+            "platform": "tiktok",
+            "platformVariantsId": "variant-1",
+            "platformSku": "platform-1",
+        }, {
+            "shopId": 953938,
+            "platform": "tiktok",
+            "platformVariantsId": "variant-2",
+            "platformSku": "platform-2",
+        }]
+        client = SkuSyncClient([row], {"single-1": complete_relations})
+        with tempfile.TemporaryDirectory() as cache_dir:
+            manager = UpSellerSkuManager(
+                str(Path(cache_dir) / "all_up_seller_sku.json"))
+            manager.add({
+                **row,
+                "relationVos": complete_relations[:1],
+            })
+            manager.load_and_update_all_sku(client)
+
+        self.assertEqual(["single-1"], client.relation_calls)
+        self.assertEqual(2, len(manager.sku_map["SINGLE"]["relationVos"]))
+        self.assertEqual("SINGLE", manager.resolve_sales_sku({
+            "shopId": 953938,
+            "platform": "tiktok",
+            "variationId": "variant-2",
+        }))
+
+    def test_sku_sync_skips_relation_query_when_count_matches(self):
+        relation = {
+            "shopId": 953938,
+            "platform": "tiktok",
+            "platformVariantsId": "variant-1",
+            "platformSku": "platform-1",
+        }
+        row = {
+            "idStr": "single-1",
+            "sku": "SINGLE",
+            "isGroup": 0,
+            "mappingStatus": True,
+            "relationCount": 1,
+            "relationVos": [relation],
+        }
+        client = SkuSyncClient([row], {"single-1": [relation]})
+        with tempfile.TemporaryDirectory() as cache_dir:
+            manager = UpSellerSkuManager(
+                str(Path(cache_dir) / "all_up_seller_sku.json"))
+            manager.load_and_update_all_sku(client)
+
+        self.assertEqual([], client.relation_calls)
+        self.assertEqual([relation], manager.sku_map["SINGLE"]["relationVos"])
 
     def test_relation_mapping_has_priority_and_group_is_expanded(self):
         sku_manager = self.build_sku_manager()

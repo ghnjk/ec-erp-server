@@ -139,6 +139,7 @@ class UpSellerClient:
         self.sku_detail_single_url = f"{self.base_url}/api/sku/detail-single"
         self.sku_detail_spu_url = f"{self.base_url}/api/sku/detail-spu"
         self.sku_detail_group_url = f"{self.base_url}/api/sku/detail-group"
+        self.sku_relation_detail_url = f"{self.base_url}/api/sku/sku-relation-detail"
         self.warehouse_list_url = f"{self.base_url}/api/warehouse/index"
         self.warehouse_enable_list_url = f"{self.base_url}/api/warehouse/list-enable"
         self.warehouse_sku_list_url = f"{self.base_url}/api/warehouse-sku/list"
@@ -701,6 +702,27 @@ class UpSellerClient:
         self._check_response(res, "query_sku_detail")
         self.save_cookies()
         return res.get("data")
+
+    def query_sku_relation_detail(
+            self,
+            sku_id: typing.Union[int, str],
+            page_size: int = 200) -> typing.List[dict]:
+        """分页兼容地拉取单个 SKU 的全部平台关联。"""
+        rows = []
+        page_no = 1
+        while True:
+            res = self.get(self.sku_relation_detail_url, params={
+                "skuId": str(sku_id),
+                "pageNum": page_no,
+                "pageSize": page_size,
+            }).json()
+            self._check_response(res, "query_sku_relation_detail")
+            page = self._extract_page(res.get("data"))
+            rows.extend(page["rows"])
+            if page_no >= page["total_page"]:
+                break
+            page_no += 1
+        return rows
 
     def query_warehouse_list(self, enable_only: bool = False):
         url = self.warehouse_enable_list_url if enable_only else self.warehouse_list_url

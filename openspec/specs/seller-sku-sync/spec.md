@@ -57,6 +57,8 @@ def refresh_local_sku_cache(self) -> None: ...
 - **GIVEN** `UpSellerAdapter` 实例已登录
 - **WHEN** 调用 `refresh_local_sku_cache()`
 - **THEN** `cookies/all_up_seller_sku.json` SHALL 被覆盖写入 UpSeller 全量 SKU 数据。
+- **AND** 对 `mappingStatus=true` 的 SKU，本地 `relationVos` 数量 SHALL 与列表接口返回的
+  `relationCount` 一致；数量不一致时必须通过关联详情接口补全，不能复用不完整的旧缓存。
 
 ### Requirement: `sync_sku_inventory.py` 必须按抽象字段重写库存计算
 

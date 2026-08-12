@@ -171,7 +171,10 @@ python tools/up_seller_cookie.py \
 - `POST /api/product-map-sku/map`
 - `POST /api/product-map-sku/unmap`
 
-本次 client 只落 SKU 查询和详情，映射接口暂不实现。
+`UpSellerClient.query_sku_relation_detail()` 已实现
+`GET /api/sku/sku-relation-detail`。接口当前在 `data` 中返回完整关联数组，数组长度应与 SKU
+列表的 `relationCount` 一致；当前不分页，但 client 通过统一分页结构循环读取，以兼容后续接口
+改为分页响应。其余映射增删接口暂不实现。
 
 ## 3. SKU 库存
 
@@ -330,6 +333,7 @@ python tools/up_seller_cookie.py \
 - `load_all_sku()`：分页调用 `/api/sku/index-single`。
 - `query_sku_page()`：SKU 列表通用查询。
 - `query_sku_detail()`：按 `single/spu/group` 调详情接口。
+- `query_sku_relation_detail()`：按 SKU ID 拉取完整平台关联，兼容分页响应。
 - `query_warehouse_list()`：仓库列表。
 - `query_sku_inventory_page()`：库存列表通用查询。
 - `query_sku_inventory_detail()`：按 SKU + 仓库查库存行。

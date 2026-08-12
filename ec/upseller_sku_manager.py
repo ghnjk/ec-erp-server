@@ -11,6 +11,7 @@ UpSeller 平台的 SKU 本地缓存，与 ec/sku_manager.SkuManager 等价但适
 - 通过 isGroup / groupVOS 递归拆分组合 SKU。
 """
 import json
+import logging
 import os
 import typing
 
@@ -19,6 +20,7 @@ class UpSellerSkuManager:
 
     def __init__(self, local_db_path: str = "cookies/all_up_seller_sku.json"):
         self.local_db_path = local_db_path
+        self.logger = logging.getLogger("INVOKER")
         self.sku_map: typing.Dict[str, dict] = {}
         self.sku_id_map: typing.Dict[str, str] = {}
         self.relation_variant_id_map: typing.Dict[str, str] = {}
@@ -140,20 +142,45 @@ class UpSellerSkuManager:
         self.relation_sku_map = {}
         for r in client.load_all_sku(include_variants=False):
             old_row = old_sku_map.get(r.get("sku")) or {}
+            mapping_status = bool(r.get("mappingStatus"))
+            expected_relation_count = r.get("relationCount")
+            if expected_relation_count is not None:
+                expected_relation_count = int(expected_relation_count)
             current_id = str(r.get("idStr") or r.get("id") or "")
             old_id = str(old_row.get("idStr") or old_row.get("id") or "")
             can_reuse_old_detail = bool(current_id and current_id == old_id)
-            if can_reuse_old_detail and not r.get("relationVos") and old_row.get("relationVos"):
-                r["relationVos"] = old_row["relationVos"]
             if can_reuse_old_detail and not r.get("groupVOS") and old_row.get("groupVOS"):
                 r["groupVOS"] = old_row["groupVOS"]
             needs_group = int(r.get("isGroup") or 0) and not r.get("groupVOS")
-            needs_relation = bool(r.get("mappingStatus")) and not r.get("relationVos")
-            if needs_group or needs_relation:
+            if needs_group:
                 sku_type = "group" if int(r.get("isGroup") or 0) else "single"
                 detail = client.query_sku_detail(
                     r.get("idStr") or r.get("id"), sku_type=sku_type)
                 if isinstance(detail, dict):
                     r.update(detail)
+                    r["mappingStatus"] = mapping_status
+                    r["relationCount"] = expected_relation_count
+            relation_vos = r.get("relationVos") or []
+            needs_relation = mapping_status and (
+                expected_relation_count is None
+                or len(relation_vos) != expected_relation_count)
+            if needs_relation:
+                try:
+                    relation_vos = client.query_sku_relation_detail(
+                        r.get("idStr") or r.get("id"))
+                    if (
+                            expected_relation_count is not None
+                            and len(relation_vos) != expected_relation_count):
+                        raise ValueError(
+                            f"relation count mismatch: expected "
+                            f"{expected_relation_count}, got {len(relation_vos)}")
+                    r["relationVos"] = relation_vos
+                    if expected_relation_count is None:
+                        r["relationCount"] = len(relation_vos)
+                except Exception as e:
+                    if can_reuse_old_detail and old_row.get("relationVos"):
+                        r["relationVos"] = old_row["relationVos"]
+                    self.logger.error(
+                        f"load upseller sku relation failed, sku={r.get('sku')}: {e}")
             self.add(r)
         self.dump()
