@@ -435,7 +435,12 @@ def auto_preload_new_order():
 
         # 获取 BigSeller 客户端
         client = build_big_seller_client()
-        client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+        client.login(
+            config["big_seller_mail"],
+            config["big_seller_encoded_passwd"],
+            phone_account_code=config.get("big_seller_phone_account_code", "86"),
+            finger_print=config.get("big_seller_finger_print") or None,
+        )
         logger.info("[auto_preload_new_order] BigSeller 客户端初始化成功")
 
         # 步骤1：查询所有新订单
@@ -517,7 +522,12 @@ def auto_preload_wait_print_order():
 
         # 获取 BigSeller 客户端
         client = build_big_seller_client()
-        client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+        client.login(
+            config["big_seller_mail"],
+            config["big_seller_encoded_passwd"],
+            phone_account_code=config.get("big_seller_phone_account_code", "86"),
+            finger_print=config.get("big_seller_finger_print") or None,
+        )
         logger.info("[auto_preload_wait_print_order] BigSeller 客户端初始化成功")
 
         # 步骤4&5：处理待打印订单

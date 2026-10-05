@@ -313,7 +313,12 @@ def sync_sale_order_to_erp(order: SaleOrder):
     config = get_app_config()
     cookies_dir = config.get("cookies_dir", "../cookies")
     client = BigSellerClient(config["ydm_token"], cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies"))
-    client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+    client.login(
+        config["big_seller_mail"],
+        config["big_seller_encoded_passwd"],
+        phone_account_code=config.get("big_seller_phone_account_code", "86"),
+        finger_print=config.get("big_seller_finger_print") or None,
+    )
     
     sync_id = f"OUT-EC-{order.order_id}"
     stock_list = []

@@ -111,7 +111,7 @@ get_static_dir() -> str      # 项目根/static
 | `db_config.user` | string | MySQL 用户名 |
 | `db_config.password` | string（secret） | MySQL 密码 |
 | `ydm_token` | string（secret） | jfbym 打码平台 Token |
-| `big_seller_mail` | string | BigSeller 登录邮箱 |
+| `big_seller_mail` | string | BigSeller 登录账号。含 `@` 走邮箱登录，否则走手机号登录 |
 | `big_seller_encoded_passwd` | string（secret） | BigSeller 编码后的密码 |
 | `big_seller_warehouse_id` | int | BigSeller 仓库 ID |
 | `big_seller_shelf_id` | int | BigSeller 货架 ID |
@@ -124,6 +124,8 @@ get_static_dir() -> str      # 项目根/static
 | `listen_host` | string | `127.0.0.1` | Web 监听 IP |
 | `db_config.db_name` | string | `ec_erp_db` | 数据库名 |
 | `cookies_dir` | string | `../cookies` | Cookie/SKU 缓存目录（相对运行 cwd） |
+| `big_seller_phone_account_code` | string | `86` | 手机号登录区号。仅账号不含 `@` 时使用 |
+| `big_seller_finger_print` | string | 自动生成并写入 `big_seller.fingerprint` | 手机号登录设备指纹。配置后优先于本地文件 |
 | `sync_tool_project_id` | string | 部分脚本必填，`sync_sku_inventory` 默认 `philipine` | 同步任务对应 project_id |
 | `es_hosts` | array<string> | - | Elasticsearch 主机列表（ES 同步任务必填） |
 | `es_user` | string | - | ES Basic Auth 账号 |

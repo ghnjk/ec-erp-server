@@ -5,8 +5,10 @@
 @author: jkguo
 @create: 2023/8/1
 """
+import hashlib
 import json
 import os
+import secrets
 import time
 import typing
 import logging
@@ -18,6 +20,26 @@ from ec_erp_api.common.rate_limiter import RateLimiter
 
 GLOBAL_RATE_LIMITER = RateLimiter(max_count_per_period=1, seconds_per_period=5)
 
+# 与官网登录页 uy() 的字段顺序一致，用于生成稳定的 bsMetrics。
+_BS_METRICS_PROFILE = {
+    "userAgent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "language": "zh-CN",
+    "screen": "1920x1080",
+    "timezone": "Asia/Shanghai",
+    "hardwareConcurrency": 8,
+    "deviceMemory": 8,
+}
+
+
+def build_bs_metrics() -> str:
+    """按前端 uy() 对固定浏览器画像做 SHA-256，取前 16 位并加 fp- 前缀。"""
+    raw = json.dumps(_BS_METRICS_PROFILE, separators=(",", ":"), ensure_ascii=False)
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    return "fp-" + digest[:16]
+
 
 class BigSellerClient:
 
@@ -25,6 +47,7 @@ class BigSellerClient:
         self.check_login_url = "https://www.bigseller.com/api/v1/isLogin.json"
         self.login_web_url = "https://www.bigseller.com/zh_CN/login.htm"
         self.login_url = "https://www.bigseller.com/api/v2/user/login.json"
+        self.phone_login_url = "https://www.bigseller.com/api_v2/api/v3/auth/loginsub.json"
         self.gen_verify_code_url = "https://www.bigseller.com/api/v2/genVerifyCode.json"
         self.estimate_sku_url = "https://www.bigseller.com/api/v1/items/pageList.json"
         self.query_sku_info_url = "https://www.bigseller.com/api/v1/inventory/merchant/pageList.json"
@@ -39,12 +62,78 @@ class BigSellerClient:
         self.cookies_file_path = cookies_file_path
         self.logger = logging.getLogger("INVOKER")
 
-    def login(self, email: str, encoded_password: str):
+    def login(
+            self,
+            account: str,
+            encoded_password: str,
+            phone_account_code: str = "86",
+            finger_print: typing.Optional[str] = None):
         if self.load_cookies() and self.is_login():
             self.logger.info("use cookie login ok")
             print("use cookie login ok")
             return
-        self.__login(email, encoded_password)
+        if "@" in (account or ""):
+            self.__login(account, encoded_password)
+            return
+        self.__login_by_phone(account, encoded_password, phone_account_code, finger_print)
+
+    def __login_by_phone(
+            self,
+            account: str,
+            encoded_password: str,
+            phone_account_code: str,
+            finger_print: typing.Optional[str]):
+        self.session = requests.Session()
+        self.get(self.login_web_url)
+        access_code, verify_code = self.get_valid_verify_code()
+        print(f"access_code {access_code}, verify_code: {verify_code}")
+        response = self.post(self.phone_login_url, json={
+            "account": str(account),
+            "phoneAccountCode": str(phone_account_code or "86"),
+            "password": encoded_password,
+            "accessCode": str(access_code),
+            "picVerificationCode": str(verify_code),
+            "fingerPrint": self._resolve_finger_print(finger_print),
+            "authType": "phone",
+            "bsMetrics": build_bs_metrics(),
+        })
+        print("login response header:")
+        print(response.headers)
+        print("login response json:")
+        body = response.json()
+        print(body)
+        if body.get("code") != 0:
+            raise Exception(f"login failed: {body.get('msg') or 'login failed'}")
+        access_token = ((body.get("data") or {}).get("accessToken")) or ""
+        if access_token:
+            self.session.cookies.set("muc_token", access_token)
+        if self.is_login():
+            print(f"login {account} success save cookies")
+            self.logger.info(f"login {account} success save cookies")
+            self.save_cookies()
+        else:
+            raise Exception("login failed")
+
+    def _fingerprint_file_path(self) -> str:
+        cookies_dir = os.path.dirname(self.cookies_file_path) or "."
+        return os.path.join(cookies_dir, "big_seller.fingerprint")
+
+    def _resolve_finger_print(self, finger_print: typing.Optional[str]) -> str:
+        if finger_print:
+            return finger_print
+        path = self._fingerprint_file_path()
+        if os.path.isfile(path):
+            with open(path, "r") as fp:
+                saved = fp.read().strip()
+            if saved:
+                return saved
+        generated = secrets.token_hex(32)
+        cookies_dir = os.path.dirname(path)
+        if cookies_dir and not os.path.exists(cookies_dir):
+            os.makedirs(cookies_dir, exist_ok=True)
+        with open(path, "w") as fp:
+            fp.write(generated)
+        return generated
 
     def __login(self, email: str, encoded_password: str):
         # create new session

@@ -38,7 +38,9 @@ class BigSellerAdapter(SellerClient):
             encoded_password: str,
             warehouse_id: int,
             shelf_id,
-            shelf_name: str):
+            shelf_name: str,
+            phone_account_code: str = "86",
+            finger_print: Optional[str] = None):
         self._client = client
         self._sku_manager = sku_manager
         self._email = email
@@ -46,9 +48,16 @@ class BigSellerAdapter(SellerClient):
         self._warehouse_id = int(warehouse_id)
         self._shelf_id = shelf_id
         self._shelf_name = shelf_name
+        self._phone_account_code = phone_account_code or "86"
+        self._finger_print = finger_print
 
     def login(self) -> None:
-        self._client.login(self._email, self._encoded_password)
+        self._client.login(
+            self._email,
+            self._encoded_password,
+            phone_account_code=self._phone_account_code,
+            finger_print=self._finger_print,
+        )
 
     def get_warehouse_id(self) -> int:
         return self._warehouse_id

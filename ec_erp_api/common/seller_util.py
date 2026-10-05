@@ -116,7 +116,12 @@ def query_seller_status() -> dict:
         # BigSellerClient/YdmVerify 会向 stdout 打印验证码请求细节；状态接口只需要
         # 结构化结果，避免把 token/captcha 等中间信息写入服务日志。
         with contextlib.redirect_stdout(io.StringIO()):
-            client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+            client.login(
+                config["big_seller_mail"],
+                config["big_seller_encoded_passwd"],
+                phone_account_code=config.get("big_seller_phone_account_code", "86"),
+                finger_print=config.get("big_seller_finger_print") or None,
+            )
             status["is_login"] = bool(client.is_login())
         status["message"] = "big_seller login ok" if status["is_login"] else "big_seller login failed"
     except Exception as e:
@@ -142,6 +147,8 @@ def _build_big_seller_adapter() -> BigSellerAdapter:
         warehouse_id=int(config["big_seller_warehouse_id"]),
         shelf_id=config.get("big_seller_shelf_id"),
         shelf_name=config.get("big_seller_shelf_name", ""),
+        phone_account_code=config.get("big_seller_phone_account_code", "86"),
+        finger_print=config.get("big_seller_finger_print") or None,
     )
 
 

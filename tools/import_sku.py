@@ -26,7 +26,12 @@ def import_sku():
         db_config.get("db_name", "ec_erp_db")
     )
     client = BigSellerClient(config["ydm_token"], cookies_file_path="../cookies/big_seller.cookies")
-    client.login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+    client.login(
+        config["big_seller_mail"],
+        config["big_seller_encoded_passwd"],
+        phone_account_code=config.get("big_seller_phone_account_code", "86"),
+        finger_print=config.get("big_seller_finger_print") or None,
+    )
     sm = SkuManager(local_db_path="../cookies/all_sku.json")
     sm.load()
     sm.load_and_update_all_sku(client)

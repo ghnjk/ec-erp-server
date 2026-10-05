@@ -29,7 +29,12 @@ def build_big_seller_client() -> BigSellerClient:
         cookies_dir = config.get("cookies_dir", "../cookies")
         __BIG_SELLER_CLIENT__.set(BigSellerClient(config["ydm_token"],
                                                   cookies_file_path=os.path.join(cookies_dir, "big_seller.cookies")))
-        __BIG_SELLER_CLIENT__.get().login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+        __BIG_SELLER_CLIENT__.get().login(
+            config["big_seller_mail"],
+            config["big_seller_encoded_passwd"],
+            phone_account_code=config.get("big_seller_phone_account_code", "86"),
+            finger_print=config.get("big_seller_finger_print") or None,
+        )
         __BIG_SELLER_LOGIN_TIME__ = time.time()
     else:
         __BIG_SELLER_CLIENT__.get().load_cookies()
@@ -37,7 +42,12 @@ def build_big_seller_client() -> BigSellerClient:
         current_time = time.time()
         if __BIG_SELLER_LOGIN_TIME__ is not None and (current_time - __BIG_SELLER_LOGIN_TIME__) > __BIG_SELLER_LOGIN_TIMEOUT_SEC__:
             config = get_app_config()
-            __BIG_SELLER_CLIENT__.get().login(config["big_seller_mail"], config["big_seller_encoded_passwd"])
+            __BIG_SELLER_CLIENT__.get().login(
+                config["big_seller_mail"],
+                config["big_seller_encoded_passwd"],
+                phone_account_code=config.get("big_seller_phone_account_code", "86"),
+                finger_print=config.get("big_seller_finger_print") or None,
+            )
             __BIG_SELLER_LOGIN_TIME__ = current_time
 
     return __BIG_SELLER_CLIENT__.get()

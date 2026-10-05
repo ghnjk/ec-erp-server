@@ -30,11 +30,16 @@ BigSellerClient(ydm_token: str, cookies_file_path: str = "cookies/big_seller.coo
 
 | 方法 | 行为 |
 | ---- | ---- |
-| `login(email, encoded_password)` | 优先 `load_cookies` + `is_login` 复用；否则走 `__login` |
-| `__login` | 新 Session → 拉登录页 → 拉验证码图 → `get_valid_verify_code` → POST 登录 → 成功后 `save_cookies` |
+| `login(account, encoded_password, phone_account_code="86", finger_print=None)` | 优先 `load_cookies` + `is_login` 复用。账号含 `@` 走邮箱 `__login`；否则走手机号 `__login_by_phone` |
+| `__login` | 邮箱：新 Session → 拉登录页 → 拉验证码图 → `get_valid_verify_code` → POST `/api/v2/user/login.json`（表单 `email`/`verifyCode`）→ 成功后 `save_cookies` |
+| `__login_by_phone` | 手机号：新 Session → 拉登录页 → 拉验证码图 → POST JSON `https://www.bigseller.com/api_v2/api/v3/auth/loginsub.json`。字段为 `account`、`phoneAccountCode`、已编码 `password`、`accessCode`、`picVerificationCode`、`fingerPrint`、`authType=phone`、`bsMetrics`。`code != 0` 时抛出接口 `msg`。成功后把 `data.accessToken` 写入 cookie `muc_token`，`is_login()` 通过后再 `save_cookies` |
 | `load_cookies()` | 从 `cookies_file_path` 读 JSON 更新 `session.cookies` |
 | `save_cookies()` | 临时文件 + `os.replace` 原子写入 |
 | `is_login()` | GET `check_login_url`，看响应 `data` 字段 |
+
+`fingerPrint` 优先使用入参（配置键 `big_seller_finger_print`）。未配置时读写 cookies 同目录的 `big_seller.fingerprint`，文件不存在则用 `secrets.token_hex(32)` 生成并持久化。
+
+`bsMetrics` 由 `build_bs_metrics()` 按官网 `uy()` 计算：对固定浏览器画像（`userAgent`、`language`、`screen`、`timezone`、`hardwareConcurrency`、`deviceMemory`）做 SHA-256，取前 16 位十六进制并加 `fp-` 前缀。密码使用配置中的已编码值，不再二次加密。
 
 ### 验证码识别
 
