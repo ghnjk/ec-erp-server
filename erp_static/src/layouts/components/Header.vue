@@ -16,9 +16,10 @@
         <t-select
           v-model="selectedProject"
           :options="projectOptions"
+          :popup-props="{ overlayInnerStyle: { width: '136px' } }"
           placeholder="请选择项目"
           size="medium"
-          style="width: 120px"
+          style="width: 148px"
           @change="handleProjectChange"
         />
       </div>
@@ -143,7 +144,8 @@ const erpStatusError = ref('');
 const projectOptions = [
   { label: '菲律宾', value: 'philipine' },
   { label: '马来西亚', value: 'malaysia' },
-  { label: '印度尼西亚', value: 'indonesia' },
+  { label: '印尼-雅加达仓', value: 'indonesia' },
+  { label: '印尼-泗水仓', value: 'indonesiaWssh' },
   { label: '泰国', value: 'thailand' },
   { label: '巴西', value: 'brazil' },
 ];
@@ -153,6 +155,7 @@ const handleProjectChange = (value: string) => {
     philipine: 'http://8.210.60.7:2083/index.html',
     malaysia: 'http://8.210.60.7:2080/index.html',
     indonesia: 'http://8.210.60.7:2081/index.html',
+    indonesiaWssh: 'http://8.210.60.7:2085/index.html',
     thailand: 'http://8.210.60.7:2082/index.html',
     brazil: 'http://8.210.60.7:2084/index.html',
   };
@@ -516,7 +519,9 @@ const handleNav = (url) => {
 #projectSelector {
   margin: 0 8px;
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
+  width: max-content;
 
   .label {
     margin-right: 4px;
