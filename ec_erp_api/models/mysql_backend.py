@@ -473,10 +473,10 @@ class SaleOrder(DtoBase):
     __table_args__ = {"mysql_default_charset": "utf8"}
     project_id: Mapped[str] = Column('Fproject_id', String(128), index=True, comment='所属项目ID')
     order_id: Mapped[int] = Column('Forder_id', Integer, primary_key=True, autoincrement=True, comment='订单ID')
-    order_date: Mapped[datetime] = Column('Forder_date', DateTime, comment='订单日期')
+    order_date: Mapped[datetime] = Column('Forder_date', DateTime, index=True, comment='订单日期')
     sale_sku_list: Mapped[str] = Column('Fsale_sku_list', JSON, comment='销售SKU列表，包含sku, sku_group, sku_name, erp_sku_image_url, unit_price, quantity, total_amount')
     total_amount: Mapped[float] = Column('Ftotal_amount', Float, comment='订单总金额')
-    status: Mapped[str] = Column('Fstatus', String(128), comment='订单状态， 待同步、已同步')
+    status: Mapped[str] = Column('Fstatus', String(128), index=True, comment='订单状态， 待同步、已同步')
     is_delete: Mapped[int] = Column('Fis_delete', Integer, index=True, default=0, server_default='0', comment='是否逻辑删除, 1: 删除')
     create_time: Mapped[datetime] = Column('Fcreate_time', DateTime, index=True, default=datetime.now(),
                                            server_default=sql.func.now(), comment='创建时间')
