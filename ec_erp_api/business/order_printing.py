@@ -14,6 +14,7 @@ from datetime import datetime
 from ec_erp_api.models.mysql_backend import MysqlBackend
 from ec_erp_api.app_config import get_static_dir
 from ec.seller_client import SellerClient
+from ec_erp_api.business.label_page_adapter import get_label_page_adapter, group_label_pages
 from ec_erp_api.models.mysql_backend import OrderPrintTask
 from PyPDF2 import PdfReader, PdfWriter, Transformation
 from PyPDF2.generic import FloatObject
@@ -148,19 +149,13 @@ class PrintOrderThread(threading.Thread):
 
     def _group_order_list(self, order_list: list, pre_success_count: int):
         order_id_list = []
-        platform_order_no_list = []
-        picking_note_list = []
         # 解析所有订单信息
         platform = ""
         auth_id_list = []
         for order in order_list:
             order_id = order["id"]
             order_id_list.append(str(order_id))
-            platform_order_no = order["platformOrderId"]
-            platform_order_no_list.append(platform_order_no)
             platform = order["platform"]
-            picking_notes = order["pickingNotes"]
-            picking_note_list.append(picking_notes)
             auth_id = order.get("authId")
             if auth_id not in (None, ""):
                 auth_id_list.append(str(auth_id))
@@ -180,7 +175,7 @@ class PrintOrderThread(threading.Thread):
                 self.logger.error(traceback.format_exc())
         self._update_task_step("downloaded_all_pdf")
         if os.path.isfile(origin_all_pdf_file):
-            return self._split_and_note_pdf(origin_all_pdf_file, platform_order_no_list, picking_note_list, pre_success_count)
+            return self._split_and_note_pdf(origin_all_pdf_file, order_list, pre_success_count)
         else:
             self.task.current_step = "下载面单PDF异常。"
             append_log_to_task(self.task, f"download origin_all_pdf_file pdf failed.")
@@ -235,7 +230,8 @@ class PrintOrderThread(threading.Thread):
     def _save_task(self):
         self.backend.update_order_print_task_without_order_list(self.task)
 
-    def _add_note_to_pdf(self, origin_pdf_file: str, noted_pdf_file: str, picking_notes: dict):
+    def _add_note_to_pdf(self, origin_pdf_file: str, noted_pdf_file: str, picking_notes: dict,
+                         page_adapter=None):
         """
         :param origin_pdf_file:
         :param noted_pdf_file:
@@ -246,27 +242,43 @@ class PrintOrderThread(threading.Thread):
                             "picking_sku_name": note.picking_sku_name
             }
         ]
+        :param page_adapter: 面单适配器。默认按热敏面单把每一页放大到 150:180。
         :return:
         """
+        keep_native_page_size = bool(page_adapter and page_adapter.keep_native_page_size())
         reader = PdfReader(origin_pdf_file)
         writer = PdfWriter()
+        formatted_notes = self._format_picking_note(picking_notes) if keep_native_page_size else None
         for i in range(len(reader.pages)):
             page = reader.pages[i]
             original_width = page.mediabox[2]
             original_height = page.mediabox[3]
+            if isinstance(original_width, FloatObject):
+                original_width = original_width.as_numeric()
             if isinstance(original_height, FloatObject):
                 original_height = original_height.as_numeric()
-            new_height = original_height / 150.0 * 180.0
-            transfer_y = new_height - original_height
-            page.mediabox.upper_right = (original_width, new_height)
-            page.add_transformation(Transformation().translate(0, transfer_y))
-            if i == len(reader.pages) - 1:
-                # last page
-                self._add_mark_to_page(page, original_width, original_height, new_height, picking_notes)
+            is_last = i == len(reader.pages) - 1
+            if keep_native_page_size:
+                if is_last:
+                    footer = page_adapter.note_footer_height(len(formatted_notes), original_height)
+                    new_height = original_height + footer
+                    page.mediabox.upper_right = (original_width, new_height)
+                    page.add_transformation(Transformation().translate(0, footer))
+                    self._add_mark_to_page(
+                        page, original_width, original_height, new_height, picking_notes,
+                        text_width=page_adapter.note_text_width(original_width), fit_notes=True)
+            else:
+                new_height = original_height / 150.0 * 180.0
+                transfer_y = new_height - original_height
+                page.mediabox.upper_right = (original_width, new_height)
+                page.add_transformation(Transformation().translate(0, transfer_y))
+                if is_last:
+                    self._add_mark_to_page(page, original_width, original_height, new_height, picking_notes)
             writer.add_page(page)
         writer.write(noted_pdf_file)
 
-    def _add_mark_to_page(self, page, original_width, original_height, new_height, picking_notes):
+    def _add_mark_to_page(self, page, original_width, original_height, new_height, picking_notes,
+                          text_width=None, fit_notes=False):
         import io
         from reportlab.lib.units import inch
         from reportlab.platypus import Paragraph
@@ -283,15 +295,17 @@ class PrintOrderThread(threading.Thread):
         cnt = 0
         all_notes = self._format_picking_note(picking_notes)
         mark_rect_height = new_height - original_height
-        max_row_count = 6
-        while len(all_notes) > max_row_count:
-            max_row_count += 6
-            mark_rect_height += new_height - original_height
+        if not fit_notes:
+            max_row_count = 6
+            while len(all_notes) > max_row_count:
+                max_row_count += 6
+                mark_rect_height += new_height - original_height
         can.setFillColorRGB(0.7, 0.7, 0.7)
         can.rect(0, 0, original_width, mark_rect_height, fill=1)
+        wrap_width = 3 * inch if text_width is None else text_width
         for note in all_notes:
             p = Paragraph(note, style)
-            p.wrapOn(can, 3 * inch, 8 * inch)
+            p.wrapOn(can, wrap_width, 8 * inch)
             p.drawOn(can, 0, mark_rect_height - line_height - line_height * cnt)
             # if cnt < max_row_count:
             #     p.drawOn(can, 0, mark_rect_height - line_height - line_height * cnt)
@@ -396,53 +410,74 @@ class PrintOrderThread(threading.Thread):
                 self._save_task()
                 return
 
-    def _split_and_note_pdf(self, origin_all_pdf_file, platform_order_no_list, picking_note_list, pre_success_count: int):
+    def _fit_thermal_label_page(self, page):
+        original_width = 282.0
+        original_height = 423.0
+        new_height = original_height / 150.0 * 180.0
+        transfer_y = new_height - original_height
+        page.mediabox.upper_right = (original_width, new_height)
+        page.add_transformation(Transformation().translate(0, transfer_y))
+
+    def _write_split_order(self, split_writer, order, idx, pre_success_count, page_adapter, thermal_page):
+        order_no = order["platformOrderId"]
+        split_succ_idx = pre_success_count + idx
+        origin_pdf_file = os.path.join(self.base_dir, f"split.{order_no}.{split_succ_idx}.origin.pdf")
+        split_writer.write(origin_pdf_file)
+        split_writer.close()
+        picking_notes = order["pickingNotes"]
+        noted_pdf_file = os.path.join(self.base_dir, f"split.{order_no}.{split_succ_idx}.noted.pdf")
+        picking_note_file = os.path.join(self.base_dir, f"split.{order_no}.{split_succ_idx}.noted.json")
+        with open(picking_note_file, "w") as fp:
+            json.dump(picking_notes, fp, indent=2, ensure_ascii=False)
+        self._add_note_to_pdf(origin_pdf_file, noted_pdf_file, picking_notes, page_adapter=page_adapter)
+        self.pdf_list.append(noted_pdf_file)
+        if page_adapter.keep_native_page_size():
+            noted_reader = PdfReader(noted_pdf_file)
+            for noted_page in noted_reader.pages:
+                self.print_pdf_writer.add_page(noted_page)
+            return
+        original_width = 282.0
+        original_height = 423.0
+        new_height = original_height / 150.0 * 180.0
+        self._add_mark_to_page(thermal_page, original_width, original_height, new_height, picking_notes)
+
+    def _split_and_note_pdf(self, origin_all_pdf_file, order_list, pre_success_count: int):
         """
 
         :param origin_all_pdf_file:
-        :param platform_order_no_list:
-        :param picking_note_list:
+        :param order_list: 订单列表，需包含 platformOrderId、packageNo、shippingCarrierName、pickingNotes
         :return:
         """
-        # split all pdfs
+        carrier_name = ""
+        if order_list:
+            carrier_name = order_list[0].get("shippingCarrierName") or ""
+        page_adapter = get_label_page_adapter(carrier_name)
+        self.log(f"面单适配器 {page_adapter.__class__.__name__} carrier={carrier_name}")
         reader = PdfReader(origin_all_pdf_file)
-        split_writer = PdfWriter()
-        idx = 0
-        for i in range(len(reader.pages)):
-            page = reader.pages[i]
-            page_text = page.extract_text()
-            order_no = platform_order_no_list[idx]
-            split_writer.add_page(page)
-            # all merge page >>
-            original_width = 282.0
-            original_height = 423.0
-            new_height = original_height / 150.0 * 180.0
-            transfer_y = new_height - original_height
-            page.mediabox.upper_right = (original_width, new_height)
-            page.add_transformation(Transformation().translate(0, transfer_y))
-            # all merge page <<
-            if page_text.find(f"Order No:{order_no}") >= 0 or page_text.find(f"Order No: {order_no}") >= 0:
-                split_succ_idx = pre_success_count + idx
-                origin_pdf_file = os.path.join(self.base_dir, f"split.{order_no}.{split_succ_idx}.origin.pdf")
-                split_writer.write(origin_pdf_file)
-                split_writer.close()
-                picking_notes = picking_note_list[idx]
-                noted_pdf_file = os.path.join(self.base_dir, f"split.{order_no}.{split_succ_idx}.noted.pdf")
-                picking_note_file = os.path.join(self.base_dir, f"split.{order_no}.{split_succ_idx}.noted.json")
-                with open(picking_note_file, "w") as fp:
-                    json.dump(picking_notes, fp, indent=2, ensure_ascii=False)
-                self._add_note_to_pdf(origin_pdf_file, noted_pdf_file, picking_notes)
-                self.pdf_list.append(noted_pdf_file)
-                split_writer = PdfWriter()
-                # all merge page >>
-                self._add_mark_to_page(page, original_width, original_height, new_height, picking_notes)
-                # all merge page <<
-                idx += 1
-            # all merge page >>
-            self.print_pdf_writer.add_page(page)
-        split_writer.close()
-        # self.print_pdf_writer.add_metadata(reader.metadata)
-        if idx != len(platform_order_no_list) or len(self.pdf_list) != len(platform_order_no_list) + pre_success_count:
+        page_texts = []
+        for page in reader.pages:
+            page_texts.append(page.extract_text() or "")
+        groups = group_label_pages(page_texts, order_list, page_adapter)
+        if not groups:
+            self.log(f"print task {self.task.task_id} _split_and_note_pdf 异常， 拆分pdf数和订单数不匹配")
+            append_log_to_task(self.task, "_split_and_note_pdf 异常， 拆分pdf数和订单数不匹配")
+            return False
+        for idx, page_indexes in enumerate(groups):
+            order = order_list[idx]
+            split_writer = PdfWriter()
+            thermal_page = None
+            for page_index in page_indexes:
+                page = reader.pages[page_index]
+                split_writer.add_page(page)
+                if not page_adapter.keep_native_page_size():
+                    self._fit_thermal_label_page(page)
+                    thermal_page = page
+            self._write_split_order(
+                split_writer, order, idx, pre_success_count, page_adapter, thermal_page)
+            if not page_adapter.keep_native_page_size():
+                for page_index in page_indexes:
+                    self.print_pdf_writer.add_page(reader.pages[page_index])
+        if len(self.pdf_list) != len(order_list) + pre_success_count:
             self.log(f"print task {self.task.task_id} _split_and_note_pdf 异常， 拆分pdf数和订单数不匹配")
             append_log_to_task(self.task, "_split_and_note_pdf 异常， 拆分pdf数和订单数不匹配")
             return False
