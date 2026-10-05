@@ -215,6 +215,7 @@ SKU销售价格、销售订单管理接口。
   - SKU 详情字段 `warehouseVOS`（注意大写）替代 `warehouseVoList`
   - 库存接口 `/api/warehouse-sku/list` 不返回 `avgDailySales`，`avg_daily_sales` 由 adapter 默认置 0
   - 入/出库走独立端点 `/api/warehouse-inout-list/add-in` 与 `/add-out`，无 shelf 概念
+  - 订单打印走同一套仓库接口。待打单对应 `orderState=in_process` 且 `labelStatus=success`，物流方式按渠道 `authIdStr` 汇总；面单下载为 `POST /api/print-label` 后轮询 `/api/check-process`，标记已打印为 `POST /api/order/mark-print`（`markType=2`）
 
 配置项：
 - `use_up_seller`: true

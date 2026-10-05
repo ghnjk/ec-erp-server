@@ -103,3 +103,33 @@ class SellerClient(Protocol):
         返回字典（允许为空）表示区间统计完整，未出现的 SKU 视为真实零销量。
         """
         ...
+
+    def get_sku_manager(self):
+        """返回当前平台的本地 SKU 缓存，供拣货备注匹配图片和名称。"""
+        ...
+
+    def get_wait_print_order_ship_provider_list(self) -> list:
+        """待打单按物流方式汇总。元素至少包含 id、name、count。"""
+        ...
+
+    def search_wait_print_order(self, shipping_provider_id, current_page, page_size):
+        """按物流方式分页查询待打单。返回 (total, rows)，行字段与仓库列表接口一致。"""
+        ...
+
+    def get_order_detail(self, order_id) -> dict:
+        """订单详情，字段对齐仓库拣货分析使用的 BigSeller orderDetail。"""
+        ...
+
+    def download_order_mask_pdf_file(
+            self,
+            order_id: str,
+            mark_id: str,
+            platform: str,
+            save_pdf_file: str,
+            auth_ids: Optional[str] = None) -> None:
+        """下载这一批订单的面单 PDF。auth_ids 仅 UpSeller 需要。"""
+        ...
+
+    def mark_order_printed(self, order_id: str):
+        """把逗号分隔的订单标记为面单已打印。"""
+        ...

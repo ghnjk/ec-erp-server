@@ -149,6 +149,11 @@ class UpSellerClient:
         self.out_stock_url = f"{self.base_url}/api/warehouse-inout-list/add-out"
         self.product_sale_list_url = f"{self.base_url}/api/statistics/product-sale-all-list"
         self.variation_sale_list_url = f"{self.base_url}/api/statistics/variation-sale-all-list"
+        self.order_index_url = f"{self.base_url}/api/order/index"
+        self.order_detail_url = f"{self.base_url}/api/order/detail"
+        self.print_label_url = f"{self.base_url}/api/print-label"
+        self.check_process_url = f"{self.base_url}/api/check-process"
+        self.mark_print_url = f"{self.base_url}/api/order/mark-print"
 
         self.session = requests.Session()
         self.auto_verify_coder = YdmVerify(ydm_token)
@@ -877,6 +882,159 @@ class UpSellerClient:
         self.save_cookies()
         self._check_response(res, "out_stock_from_erp")
         return res.get("data")
+
+    def search_wait_print_order_page(
+            self,
+            warehouse_id,
+            page_num: int = 1,
+            page_size: int = 100,
+            auth_id=None):
+        """查询待打单（面单已获取）订单页。
+
+        筛选对齐 UpSeller 待打单页：orderState=in_process、labelStatus=success。
+        不传 printCount，已打印但仍停留在待打单的订单也会返回。
+        """
+        form = {
+            "orderState": "in_process",
+            "labelStatus": "success",
+            "isVoided": "0",
+            "warehouseType": 0,
+            "pageNum": int(page_num),
+            "pageSize": int(page_size),
+            "searchType": "0",
+            "searchValue": "",
+            "sortName": "1",
+            "sortValue": "1",
+            "timeType": "0",
+            "warehouseIdList": [str(warehouse_id)],
+        }
+        if auth_id not in (None, ""):
+            form["authIdList"] = [str(auth_id)]
+        res = self.post_form(self.order_index_url, form).json()
+        self._check_response(res, "search_wait_print_order")
+        page = self._extract_page(res.get("data"))
+        return int(page["total_size"] or 0), page["rows"]
+
+    def get_order_detail_raw(self, order_id) -> dict:
+        res = self.get(self.order_detail_url, params={"id": str(order_id)}).json()
+        self._check_response(res, "get_order_detail")
+        data = res.get("data")
+        return data if isinstance(data, dict) else {}
+
+    def download_order_label_pdf(self, order_ids, auth_ids, save_pdf_file: str):
+        """提交面单打印任务，轮询完成后把 PDF 下载到本地。"""
+        order_id_list = [str(item) for item in order_ids if str(item)]
+        auth_id_list = [str(item) for item in auth_ids if str(item)]
+        if not order_id_list:
+            raise Exception("print_label missing order id")
+        if len(auth_id_list) != len(order_id_list):
+            raise Exception("print_label order id and auth id count mismatch")
+        form = {
+            "isCos": 1,
+            "printIdStr": ",".join(order_id_list),
+            "authIdStr": ",".join(auth_id_list),
+            "isBatchPrint": 1 if len(order_id_list) > 1 else 0,
+            "scene": 1,
+        }
+        res = self.post_form(self.print_label_url, form, timeout=60).json()
+        self._check_response(res, "print_label")
+        data = res.get("data")
+        if isinstance(data, dict) and data.get("channels") and data.get("msg"):
+            raise Exception(f"print_label failed: {data.get('msg')}")
+        process_uuid = self._extract_process_uuid(data)
+        process = self._poll_check_process(process_uuid)
+        pdf_url = self._extract_pdf_url(process.get("msg"))
+        if not pdf_url:
+            raise Exception(
+                f"print_label missing pdf url: {json.dumps(process, ensure_ascii=False)[:500]}")
+        self.download(pdf_url, save_pdf_file)
+
+    def mark_orders_printed(self, order_ids):
+        """把面单标记为已打印。markType=2 表示面单，不是拣货单。"""
+        order_id_list = [str(item) for item in order_ids if str(item)]
+        if not order_id_list:
+            raise Exception("mark_order_printed missing order id")
+        form = {
+            "mark": 1,
+            "markType": 2,
+            "scene": 1,
+            "isBatch": 1 if len(order_id_list) > 1 else 0,
+            "orderIdList": order_id_list,
+        }
+        res = self.post_form(self.mark_print_url, form, timeout=60).json()
+        self._check_response(res, "mark_order_printed")
+        return res.get("data")
+
+    def _poll_check_process(self, process_uuid: str, timeout_seconds: int = 180, interval: float = 1.5):
+        deadline = time.time() + timeout_seconds
+        last_process = None
+        while time.time() < deadline:
+            res = self.get(
+                self.check_process_url,
+                params={"uuid": process_uuid},
+                timeout=30,
+            ).json()
+            if not isinstance(res, dict):
+                raise Exception(f"check-process failed: {res}")
+            if res.get("code") not in (0, None):
+                raise Exception(
+                    f"check-process failed: {json.dumps(res, ensure_ascii=False)[:500]}")
+            data = res.get("data") if isinstance(res.get("data"), dict) else {}
+            process = data.get("processMsg") if isinstance(data, dict) else None
+            if process is None and isinstance(res.get("processMsg"), dict):
+                process = res.get("processMsg")
+            if not isinstance(process, dict):
+                raise Exception(
+                    f"check-process unexpected: {json.dumps(res, ensure_ascii=False)[:500]}")
+            last_process = process
+            code = process.get("code")
+            try:
+                code = int(code)
+            except (TypeError, ValueError):
+                pass
+            if code == 1:
+                return process
+            if code == -1:
+                raise Exception(
+                    f"print_label process failed: {json.dumps(process, ensure_ascii=False)[:500]}")
+            time.sleep(interval)
+        raise Exception(
+            f"print_label timeout: {json.dumps(last_process, ensure_ascii=False)[:500]}")
+
+    @staticmethod
+    def _extract_process_uuid(data):
+        if isinstance(data, str) and data.strip():
+            return data.strip()
+        if isinstance(data, dict):
+            for key in ("uuid", "processUuid", "key"):
+                value = data.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+            inner = data.get("data")
+            if isinstance(inner, str) and inner.strip():
+                return inner.strip()
+        raise Exception(f"print_label missing uuid: {data}")
+
+    @staticmethod
+    def _extract_pdf_url(msg) -> str:
+        if not isinstance(msg, str):
+            return ""
+        for part in msg.split(","):
+            url = part.strip()
+            if ".pdf" in url.lower():
+                return url
+        return ""
+
+    def download(self, url: str, file_path: str):
+        self.logger.info(f"UPSELLER DOWNLOAD url {url}")
+        res = self.session.get(url, stream=True, timeout=60)
+        if res.status_code != 200:
+            raise Exception(f"download pdf failed: http {res.status_code} url {url}")
+        with open(file_path, "wb") as fp:
+            for chunk in res.iter_content(chunk_size=4096):
+                if chunk:
+                    fp.write(chunk)
+        self.logger.info(f"UPSELLER DOWNLOAD url {url} ok.")
 
     def post(self, url: str, data=None, json=None, timeout=None):
         import json as js

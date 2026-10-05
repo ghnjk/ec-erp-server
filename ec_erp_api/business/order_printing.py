@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 from ec_erp_api.models.mysql_backend import MysqlBackend
 from ec_erp_api.app_config import get_static_dir
-from ec.bigseller.big_seller_client import BigSellerClient
+from ec.seller_client import SellerClient
 from ec_erp_api.models.mysql_backend import OrderPrintTask
 from PyPDF2 import PdfReader, PdfWriter, Transformation
 from PyPDF2.generic import FloatObject
@@ -34,7 +34,7 @@ def append_log_to_task(task: OrderPrintTask, log: str):
 
 class PrintOrderThread(threading.Thread):
 
-    def __init__(self, task: OrderPrintTask, backend: MysqlBackend, client: BigSellerClient):
+    def __init__(self, task: OrderPrintTask, backend: MysqlBackend, client: SellerClient):
         super().__init__(daemon=True)
         self.name = f"print-{task.task_id}"
         self.task = task
@@ -64,7 +64,7 @@ class PrintOrderThread(threading.Thread):
                 self.task.pdf_file_url = self.print_pdf_url
                 self._update_task_step("pdf_ready")
             else:
-                self.task.current_step = '从bigseller下载面单失败'
+                self.task.current_step = '下载面单失败'
                 self._save_task()
         except Exception as e:
             self.log(f"EXCEPTION {self.task.task_id} process async task error: {e}")
@@ -152,6 +152,7 @@ class PrintOrderThread(threading.Thread):
         picking_note_list = []
         # 解析所有订单信息
         platform = ""
+        auth_id_list = []
         for order in order_list:
             order_id = order["id"]
             order_id_list.append(str(order_id))
@@ -160,14 +161,18 @@ class PrintOrderThread(threading.Thread):
             platform = order["platform"]
             picking_notes = order["pickingNotes"]
             picking_note_list.append(picking_notes)
+            auth_id = order.get("authId")
+            if auth_id not in (None, ""):
+                auth_id_list.append(str(auth_id))
         self._update_task_step("parsed_all_order_info")
         # 一次性打印所有订单到pdf
         mark_id = f"{self.task.task_id}{random.randint(10000, 20000)}"
         origin_all_pdf_file = os.path.join(self.base_dir, f"{self.task.task_id}.origin.all.pdf")
+        auth_ids = ",".join(auth_id_list) if auth_id_list else None
         for i in range(4):
             try:
-                self.client.download_order_mask_pdf_file(",".join(order_id_list), mark_id, platform,
-                                                         origin_all_pdf_file)
+                self.client.download_order_mask_pdf_file(
+                    ",".join(order_id_list), mark_id, platform, origin_all_pdf_file, auth_ids=auth_ids)
                 break
             except Exception as e:
                 time.sleep(1)
@@ -177,7 +182,7 @@ class PrintOrderThread(threading.Thread):
         if os.path.isfile(origin_all_pdf_file):
             return self._split_and_note_pdf(origin_all_pdf_file, platform_order_no_list, picking_note_list, pre_success_count)
         else:
-            self.task.current_step = "从bigseller下载pdf异常。"
+            self.task.current_step = "下载面单PDF异常。"
             append_log_to_task(self.task, f"download origin_all_pdf_file pdf failed.")
             self._save_task()
             return False
@@ -357,11 +362,11 @@ class PrintOrderThread(threading.Thread):
         all_steps = [
             {
                 "id": "parsed_all_order_info",
-                "name": "解析订单信息, 开始从bigseller下载面单PDF"
+                "name": "解析订单信息, 开始下载面单PDF"
             },
             {
                 "id": "downloaded_all_pdf",
-                "name": "从bigseller下载面单PDF完成，为订单增加拣货备注"
+                "name": "下载面单PDF完成，为订单增加拣货备注"
             },
             {
                 "id": "noted_all_pdf",
@@ -369,7 +374,7 @@ class PrintOrderThread(threading.Thread):
             },
             {
                 "id": "merged_all_pdf",
-                "name": "完成合并所有订单pdf, 接下来在bigseller上标记订单已打印"
+                "name": "完成合并所有订单pdf, 接下来标记订单已打印"
             },
             {
                 "id": "marked_all_order_printed",

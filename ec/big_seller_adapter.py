@@ -156,3 +156,29 @@ class BigSellerAdapter(SellerClient):
     def load_sku_avg_daily_sales(self, begin_date, end_date):
         # BigSeller 继续使用库存接口直接返回的 avgDailySales。
         return None
+
+    def get_sku_manager(self):
+        return self._sku_manager
+
+    def get_wait_print_order_ship_provider_list(self) -> list:
+        return self._client.get_wait_print_order_ship_provider_list(self._warehouse_id)
+
+    def search_wait_print_order(self, shipping_provider_id, current_page, page_size):
+        return self._client.search_wait_print_order(
+            shipping_provider_id, current_page, page_size)
+
+    def get_order_detail(self, order_id) -> dict:
+        return self._client.get_order_detail(order_id)
+
+    def download_order_mask_pdf_file(
+            self,
+            order_id: str,
+            mark_id: str,
+            platform: str,
+            save_pdf_file: str,
+            auth_ids: Optional[str] = None) -> None:
+        self._client.download_order_mask_pdf_file(
+            order_id, mark_id, platform, save_pdf_file)
+
+    def mark_order_printed(self, order_id: str):
+        return self._client.mark_order_printed(order_id)

@@ -171,6 +171,140 @@ class UpSellerAdapter(SellerClient):
             return None
         return self._sales_manager.load_avg_daily_sales(begin_date, end_date)
 
+    def get_sku_manager(self):
+        return self._sku_manager
+
+    def get_wait_print_order_ship_provider_list(self) -> list:
+        grouped = {}
+        for row in self._iter_wait_print_rows():
+            auth_id = str(row.get("authIdStr") or row.get("authId") or "")
+            if not auth_id:
+                continue
+            item = grouped.get(auth_id)
+            if item is None:
+                item = {
+                    "id": auth_id,
+                    "name": row.get("providerName") or auth_id,
+                    "count": 0,
+                    "platform": row.get("platform") or "",
+                }
+                grouped[auth_id] = item
+            item["count"] += 1
+        return list(grouped.values())
+
+    def search_wait_print_order(self, shipping_provider_id, current_page, page_size):
+        total, rows = self._client.search_wait_print_order_page(
+            self._warehouse_id,
+            page_num=current_page,
+            page_size=page_size,
+            auth_id=shipping_provider_id,
+        )
+        return total, [self._map_wait_print_order(row) for row in rows]
+
+    def get_order_detail(self, order_id) -> dict:
+        raw = self._client.get_order_detail_raw(order_id)
+        order = raw.get("order") if isinstance(raw.get("order"), dict) else {}
+        items = self._collect_order_items(raw, order)
+        return {
+            "splitOrder": bool(int(order.get("isSplit") or 0)),
+            "orderItemVoList": [
+                self._map_order_item(item, order) for item in items
+            ],
+        }
+
+    def download_order_mask_pdf_file(
+            self,
+            order_id: str,
+            mark_id: str,
+            platform: str,
+            save_pdf_file: str,
+            auth_ids: Optional[str] = None) -> None:
+        order_ids = [part for part in str(order_id).split(",") if part]
+        auth_id_list = [part for part in str(auth_ids or "").split(",") if part]
+        self._client.download_order_label_pdf(order_ids, auth_id_list, save_pdf_file)
+
+    def mark_order_printed(self, order_id: str):
+        order_ids = [part for part in str(order_id).split(",") if part]
+        return self._client.mark_orders_printed(order_ids)
+
+    def _iter_wait_print_rows(self, auth_id=None, page_size: int = 100):
+        page_num = 1
+        seen = 0
+        while page_num <= 200:
+            total, rows = self._client.search_wait_print_order_page(
+                self._warehouse_id,
+                page_num=page_num,
+                page_size=page_size,
+                auth_id=auth_id,
+            )
+            if not rows:
+                break
+            for row in rows:
+                yield row
+            seen += len(rows)
+            if seen >= int(total or 0):
+                break
+            page_num += 1
+
+    @staticmethod
+    def _map_wait_print_order(row: dict) -> dict:
+        return {
+            "id": str(row.get("idStr") or row.get("id") or ""),
+            "shopId": row.get("shopId"),
+            "platformOrderId": str(row.get("orderId") or ""),
+            "packageNo": row.get("orderNumber") or "",
+            "shippingCarrierName": row.get("providerName") or "",
+            "trackingNo": row.get("trackingNumber") or "",
+            "multilingualViewStatus": "待打单",
+            "amount": row.get("orderAmount") or "",
+            "platform": row.get("platform") or "",
+            "printLabelMark": int(row.get("isPrintLabel") or 0),
+            "authId": str(row.get("authIdStr") or row.get("authId") or ""),
+        }
+
+    @staticmethod
+    def _collect_order_items(raw: dict, order: dict) -> list:
+        items = order.get("orderItemList") or []
+        if items:
+            return items
+        collected = []
+        for group in raw.get("orderGroupVoList") or []:
+            if isinstance(group, dict):
+                collected.extend(group.get("orderItemList") or [])
+        return collected
+
+    def _map_order_item(self, item: dict, order: dict) -> dict:
+        platform_sku = str(item.get("variationSku") or item.get("productSku") or "").strip()
+        inventory_sku = self._sku_manager.resolve_sales_sku({
+            "shopId": item.get("shopId") or order.get("shopId"),
+            "platform": item.get("platform") or order.get("platform"),
+            "variationId": item.get("variationId"),
+            "variationSku": platform_sku,
+        }) or platform_sku
+        quantity = int(item.get("productCount") or 0)
+        sku_info = self._sku_manager.sku_map.get(inventory_sku) or {}
+        group_list = None
+        if int(sku_info.get("isGroup") or 0):
+            group_list = []
+            for child in sku_info.get("groupVOS") or []:
+                child_sku = str(child.get("varSku") or "").strip()
+                child_num = int(child.get("num") or 0)
+                if child_sku and child_num > 0:
+                    group_list.append({
+                        "varSku": child_sku,
+                        "num": child_num,
+                    })
+            if not group_list:
+                group_list = None
+        return {
+            "id": str(item.get("idStr") or item.get("id") or ""),
+            "allocated": quantity,
+            "allocating": quantity,
+            "varSku": platform_sku,
+            "inventorySku": inventory_sku,
+            "varSkuGroupVoList": group_list,
+        }
+
     @staticmethod
     def _extract_stock_result(raw, total: int) -> StockResult:
         # UpSeller 接口返回字段尚未在探测中确认，做最大兼容：

@@ -10,13 +10,12 @@ import time
 
 from ec_erp_api.common.api_core import api_post_request
 from ec_erp_api.common import request_util, response_util, request_context, big_seller_util
+from ec_erp_api.common.seller_util import build_seller_client
 from flask import (
     Blueprint
 )
 from ec_erp_api.models.mysql_backend import MysqlBackend, DtoUtil
 from ec_erp_api.business.order_printing import PrintOrderThread, append_log_to_task
-from ec.sku_manager import SkuManager
-from ec.bigseller.big_seller_client import BigSellerClient
 from ec_erp_api.models.mysql_backend import OrderPrintTask, SkuPickingNote
 
 warehouse_apis = Blueprint('warehouse', __name__)
@@ -27,12 +26,8 @@ warehouse_apis = Blueprint('warehouse', __name__)
 def get_order_statics():
     if not request_context.validate_user_permission(request_context.PMS_WAREHOUSE):
         return response_util.pack_error_response(1008, "权限不足")
-    from ec_erp_api.app_config import get_app_config
-    config = get_app_config()
-    client = big_seller_util.build_big_seller_client()
-    res = client.get_wait_print_order_ship_provider_list(
-        config.get("big_seller_warehouse_id")
-    )
+    client = build_seller_client()
+    res = client.get_wait_print_order_ship_provider_list()
     return response_util.pack_json_response({
         "ship_provider_list": res
     })
@@ -46,7 +41,7 @@ def search_wait_print_order():
     shipping_provider_id = request_util.get_str_param("shipping_provider_id")
     current_page = request_util.get_int_param("current_page")
     page_size = request_util.get_int_param("page_size")
-    client = big_seller_util.build_big_seller_client()
+    client = build_seller_client()
     
     # 底层client最多支持page_size=200，如果page_size > 200，需要分页查询
     MAX_PAGE_SIZE = 200
@@ -95,13 +90,17 @@ def search_wait_print_order():
         # 截取准确的数量（最后一批可能超出）
         rows = all_rows[:page_size]
     remain_keys = [
-        "id", "shopId", "platformOrderId", "packageNo", "shippingCarrierName", "trackingNo", "multilingualViewStatus", "amount", "platform"
+        "id", "shopId", "platformOrderId", "packageNo", "shippingCarrierName", "trackingNo",
+        "multilingualViewStatus", "amount", "platform", "printLabelMark",
     ]
     formated_rows = []
     for item in rows:
         formated_row = {}
         for key in remain_keys:
-            formated_row[key] = item[key]
+            formated_row[key] = item.get(key)
+        auth_id = item.get("authId")
+        if auth_id not in (None, ""):
+            formated_row["authId"] = auth_id
         formated_rows.append(formated_row)
     return response_util.pack_json_response(
         {
@@ -129,7 +128,7 @@ class OrderSkuCounter(object):
 
 class OrderAnalysis(object):
 
-    def __init__(self, sku_manager: SkuManager, backend: MysqlBackend, client: BigSellerClient):
+    def __init__(self, sku_manager, backend: MysqlBackend, client):
         self.sku_manager = sku_manager
         self.backend = backend
         self.client = client
@@ -379,10 +378,10 @@ def pre_submit_print_order():
     if not request_context.validate_user_permission(request_context.PMS_WAREHOUSE):
         return response_util.pack_error_response(1008, "权限不足")
     order_list = request_util.get_param("order_list")
-    sku_manager = big_seller_util.build_sku_manager()
+    seller = build_seller_client()
+    sku_manager = seller.get_sku_manager()
     backend = request_context.get_backend()
-    client = big_seller_util.build_big_seller_client()
-    order_analysis = OrderAnalysis(sku_manager, backend, client)
+    order_analysis = OrderAnalysis(sku_manager, backend, seller)
     order_analysis.parse_all_orders(order_list)
     if len(order_analysis.need_manual_mark_sku_list) == 0:
         # 所有货品都有拣货备注
@@ -493,7 +492,7 @@ def start_run_print_order_task():
     append_log_to_task(task, "启动打印任务")
     backend.update_order_print_task_without_order_list(task)
     t = PrintOrderThread(
-        task, request_context.get_backend(), big_seller_util.build_big_seller_client()
+        task, request_context.get_backend(), build_seller_client()
     )
     t.start()
     task_dict = DtoUtil.to_dict(task)
