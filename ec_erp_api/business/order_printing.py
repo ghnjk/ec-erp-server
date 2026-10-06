@@ -451,8 +451,9 @@ class PrintOrderThread(threading.Thread):
         carrier_name = ""
         if order_list:
             carrier_name = order_list[0].get("shippingCarrierName") or ""
-        page_adapter = get_label_page_adapter(carrier_name)
-        self.log(f"面单适配器 {page_adapter.__class__.__name__} carrier={carrier_name}")
+        project_id = getattr(self.task, "project_id", "") or ""
+        page_adapter = get_label_page_adapter(carrier_name, project_id)
+        self.log(f"面单适配器 {page_adapter.__class__.__name__} carrier={carrier_name} project_id={project_id}")
         reader = PdfReader(origin_all_pdf_file)
         page_texts = []
         for page in reader.pages:

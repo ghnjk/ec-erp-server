@@ -7,6 +7,26 @@
 """
 
 NOTE_LINE_HEIGHT = 14
+BRAZIL_PROJECT_ID = "brazil"
+
+
+def contains_package_no(page_text: str, package_no: str) -> bool:
+    """
+    包裹号在页面文本中出现，且后面不是字母或数字。
+    前面不设边界：iMile 面单里包裹号紧贴在一串数字后面。
+    """
+    if not package_no:
+        return False
+    text = page_text or ""
+    start = 0
+    while True:
+        index = text.find(package_no, start)
+        if index < 0:
+            return False
+        end = index + len(package_no)
+        if end >= len(text) or not text[end].isalnum():
+            return True
+        start = index + 1
 
 
 class LabelPageAdapter(object):
@@ -26,7 +46,7 @@ class LabelPageAdapter(object):
     def has_continuation_pages(self) -> bool:
         return False
 
-    def is_continuation_page(self, page_text: str) -> bool:
+    def is_continuation_page(self, page_text: str, order: dict = None) -> bool:
         return False
 
     def keep_native_page_size(self) -> bool:
@@ -55,7 +75,7 @@ class DbaLabelPageAdapter(LabelPageAdapter):
     def has_continuation_pages(self) -> bool:
         return True
 
-    def is_continuation_page(self, page_text: str) -> bool:
+    def is_continuation_page(self, page_text: str, order: dict = None) -> bool:
         return "Lista de postagem" in (page_text or "")
 
     def keep_native_page_size(self) -> bool:
@@ -65,18 +85,28 @@ class DbaLabelPageAdapter(LabelPageAdapter):
         return float(page_width)
 
 
-class MercadoLabelPageAdapter(LabelPageAdapter):
+class PackageNoLabelPageAdapter(LabelPageAdapter):
     """
-    Mercado：页面上的平台订单号是拆开的，用包裹号匹配。页面保持原尺寸。
+    UpSeller 巴西面单：平台订单号可能被拆开或不在页面上，用包裹号匹配。
+    命中后，后续仍带同一包裹号的页（申报单 2/2 等）继续归入这一单。页面保持原尺寸。
     """
 
-    carrier_names = ("Mercado Envíos Agências",)
+    carrier_names = (
+        "Mercado Envíos Agências",
+        "iMile BR",
+        "Retirada pelo Comprador",
+        "Shopee Xpress",
+    )
 
     def page_matches(self, page_text: str, order: dict) -> bool:
-        package_no = str(order.get("packageNo") or "")
-        if not package_no:
-            return False
-        return package_no in (page_text or "")
+        return contains_package_no(page_text, str(order.get("packageNo") or ""))
+
+    def has_continuation_pages(self) -> bool:
+        return True
+
+    def is_continuation_page(self, page_text: str, order: dict = None) -> bool:
+        package_no = str((order or {}).get("packageNo") or "")
+        return contains_package_no(page_text, package_no)
 
     def keep_native_page_size(self) -> bool:
         return True
@@ -85,21 +115,23 @@ class MercadoLabelPageAdapter(LabelPageAdapter):
         return float(page_width)
 
 
+_PACKAGE_NO_ADAPTER = PackageNoLabelPageAdapter()
 _REGISTERED_ADAPTERS = (
     DbaLabelPageAdapter(),
-    MercadoLabelPageAdapter(),
+    _PACKAGE_NO_ADAPTER,
 )
 
 
-def get_label_page_adapter(shipping_carrier_name: str) -> LabelPageAdapter:
+def get_label_page_adapter(shipping_carrier_name: str, project_id: str = "") -> LabelPageAdapter:
     name = (shipping_carrier_name or "").strip()
-    if not name:
-        return LabelPageAdapter()
     folded = name.casefold()
-    for adapter in _REGISTERED_ADAPTERS:
-        for carrier in adapter.carrier_names:
-            if folded == carrier.casefold():
-                return adapter
+    if folded:
+        for adapter in _REGISTERED_ADAPTERS:
+            for carrier in adapter.carrier_names:
+                if folded == carrier.casefold():
+                    return adapter
+    if (project_id or "").strip() == BRAZIL_PROJECT_ID:
+        return _PACKAGE_NO_ADAPTER
     return LabelPageAdapter()
 
 
@@ -119,7 +151,7 @@ def group_label_pages(page_texts, orders, adapter: LabelPageAdapter):
             return None
         text = page_texts[page_index] or ""
         order = orders[order_idx]
-        if matched and adapter.has_continuation_pages() and not adapter.is_continuation_page(text):
+        if matched and adapter.has_continuation_pages() and not adapter.is_continuation_page(text, order):
             groups.append(current)
             current = []
             matched = False
