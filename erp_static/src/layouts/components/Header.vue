@@ -150,6 +150,7 @@ const handleProjectChange = (value: string) => {
     malaysia: 'http://8.210.60.7:2080/index.html',
     indonesia: 'http://8.210.60.7:2081/index.html',
     indonesiaWssh: 'http://8.210.60.7:2085/index.html',
+    indonesiaWyjd: 'http://8.210.60.7:2086/index.html',
     thailand: 'http://8.210.60.7:2082/index.html',
     brazil: 'http://8.210.60.7:2084/index.html',
   };
