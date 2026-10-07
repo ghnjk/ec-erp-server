@@ -17,6 +17,15 @@
             <t-button theme="default" @click="onShowAddDialog">
           新增拣货备注
         </t-button>
+            <t-button theme="default" :loading="exportLoading" @click="onExportAll">全部导出</t-button>
+            <t-button theme="default" :loading="importParsing" @click="onChooseImportFile">导入</t-button>
+            <input
+              ref="importFileInputRef"
+              class="import-file-input"
+              type="file"
+              accept=".xlsx"
+              @change="onImportFileChange"
+            />
           </t-form-item>
         </t-form>
       </div>
@@ -121,6 +130,94 @@
         </t-form-item>
       </t-form>
     </t-dialog>
+
+    <t-dialog
+      v-model:visible="importDialogVisible"
+      header="导入拣货备注预览"
+      width="1100px"
+      :confirm-btn="importConfirmBtn"
+      cancel-btn="取消"
+      @confirm="onConfirmImport"
+    >
+      <div class="import-summary">
+        本次导入：新增 {{ importPreview.created.length }} 条，覆盖 {{ importPreview.overwritten.length }} 条，无变化
+        {{ importPreview.unchangedCount }} 条。
+      </div>
+      <div v-if="importPreview.errors.length" class="import-warning">
+        有 {{ importPreview.errors.length }} 行校验失败，确认导入后将跳过这些行。
+      </div>
+      <t-tabs :value="importPreviewTab" @change="onImportPreviewTabChange">
+        <t-tab-panel value="created" :label="`新增 (${importPreview.created.length})`">
+          <t-table
+            :columns="importCreatedColumns"
+            :data="importPreview.created"
+            row-key="rowIndex"
+            bordered
+            hover
+            size="small"
+            max-height="420"
+          >
+            <template #support_pkg_picking="{ row }">
+              {{ row.support_pkg_picking ? '是' : '否' }}
+            </template>
+          </t-table>
+        </t-tab-panel>
+        <t-tab-panel value="overwritten" :label="`覆盖 (${importPreview.overwritten.length})`">
+          <t-table
+            :columns="importOverwriteColumns"
+            :data="importPreview.overwritten"
+            row-key="rowIndex"
+            bordered
+            hover
+            size="small"
+            max-height="420"
+          >
+            <template #picking_unit="{ row }">
+              <span :class="{ 'import-field-changed': isImportFieldChanged(row, 'picking_unit') }">
+                {{ importFieldText(row, 'picking_unit') }}
+              </span>
+            </template>
+            <template #picking_unit_name="{ row }">
+              <span :class="{ 'import-field-changed': isImportFieldChanged(row, 'picking_unit_name') }">
+                {{ importFieldText(row, 'picking_unit_name') }}
+              </span>
+            </template>
+            <template #picking_sku_name="{ row }">
+              <span :class="{ 'import-field-changed': isImportFieldChanged(row, 'picking_sku_name') }">
+                {{ importFieldText(row, 'picking_sku_name') }}
+              </span>
+            </template>
+            <template #support_pkg_picking="{ row }">
+              <span :class="{ 'import-field-changed': isImportFieldChanged(row, 'support_pkg_picking') }">
+                {{ importFieldText(row, 'support_pkg_picking') }}
+              </span>
+            </template>
+            <template #pkg_picking_unit="{ row }">
+              <span :class="{ 'import-field-changed': isImportFieldChanged(row, 'pkg_picking_unit') }">
+                {{ importFieldText(row, 'pkg_picking_unit') }}
+              </span>
+            </template>
+            <template #pkg_picking_unit_name="{ row }">
+              <span :class="{ 'import-field-changed': isImportFieldChanged(row, 'pkg_picking_unit_name') }">
+                {{ importFieldText(row, 'pkg_picking_unit_name') }}
+              </span>
+            </template>
+          </t-table>
+        </t-tab-panel>
+        <t-tab-panel value="errors" :label="`校验失败 (${importPreview.errors.length})`">
+          <t-table
+            :columns="importErrorColumns"
+            :data="importPreview.errors"
+            row-key="rowIndex"
+            bordered
+            hover
+            size="small"
+            max-height="420"
+          />
+        </t-tab-panel>
+      </t-tabs>
+      <div class="import-hint">确认后才会写入当前国家，不会删除文件中未出现的 SKU。</div>
+    </t-dialog>
   </div>
 </template>
 
@@ -130,10 +227,22 @@ export default {
 };
 </script>
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { InputNumber, Select, Input, MessagePlugin, Dialog, Form, FormItem, Button } from 'tdesign-vue-next';
 import { savePurchaseOrder, searchPurchaseOrder } from '@/apis/supplierApis';
+import { getLoginUserInfo } from '@/apis/sysApis';
 import { searchManualMarkSkuPickingNote, submitManualMarkSkuPickingNote } from '@/apis/warehouseApis';
+import { getProjectLabel } from '@/constants/project';
+import {
+  buildPickingNoteImportPreview,
+  exportPickingNoteExcel,
+  getPickingNoteFieldDiff,
+  IPickingNoteImportPreview,
+  IPickingNoteOverwriteItem,
+  PICKING_NOTE_IMPORT_BATCH_SIZE,
+  PickingNoteFieldKey,
+  toPickingNoteSubmitItem,
+} from '@/utils/skuPickingNoteExcel';
 
 const MIN_PICKING_UNIT = 0.01;
 const PICKING_UNIT_DECIMAL_PLACES = 2;
@@ -390,6 +499,53 @@ const addFormRules = ref({
 });
 
 const searchSku = ref('');
+const exportLoading = ref(false);
+const importParsing = ref(false);
+const importConfirmLoading = ref(false);
+const importDialogVisible = ref(false);
+const importPreviewTab = ref('created');
+const importFileInputRef = ref<HTMLInputElement | null>(null);
+const importPreview = ref<IPickingNoteImportPreview>({
+  created: [],
+  overwritten: [],
+  unchangedCount: 0,
+  errors: [],
+});
+const importCreatedColumns = [
+  { colKey: 'rowIndex', title: '行号', width: 70, align: 'center' },
+  { colKey: 'sku', title: 'sku', width: 160, align: 'center' },
+  { colKey: 'picking_unit', title: '1拣货单位=多少sku?', width: 160, align: 'center' },
+  { colKey: 'picking_unit_name', title: '拣货单位名', width: 120, align: 'center' },
+  { colKey: 'picking_sku_name', title: '拣货SKU名', width: 140, align: 'center' },
+  { colKey: 'support_pkg_picking', title: '是否支持PKG打包', width: 140, align: 'center' },
+  { colKey: 'pkg_picking_unit', title: '1 PKG=多少SKU', width: 140, align: 'center' },
+  { colKey: 'pkg_picking_unit_name', title: 'PKG打包单位名', width: 140, align: 'center' },
+];
+const importOverwriteColumns = [
+  { colKey: 'rowIndex', title: '行号', width: 70, align: 'center' },
+  { colKey: 'sku', title: 'sku', width: 160, align: 'center' },
+  { colKey: 'picking_unit', title: '1拣货单位=多少sku?', width: 180, align: 'center' },
+  { colKey: 'picking_unit_name', title: '拣货单位名', width: 160, align: 'center' },
+  { colKey: 'picking_sku_name', title: '拣货SKU名', width: 180, align: 'center' },
+  { colKey: 'support_pkg_picking', title: '是否支持PKG打包', width: 160, align: 'center' },
+  { colKey: 'pkg_picking_unit', title: '1 PKG=多少SKU', width: 160, align: 'center' },
+  { colKey: 'pkg_picking_unit_name', title: 'PKG打包单位名', width: 160, align: 'center' },
+];
+const importErrorColumns = [
+  { colKey: 'rowIndex', title: '行号', width: 70, align: 'center' },
+  { colKey: 'sku', title: 'sku', width: 180, align: 'center' },
+  { colKey: 'message', title: '原因', align: 'left' },
+];
+const canConfirmImport = computed(() => {
+  return importPreview.value.created.length + importPreview.value.overwritten.length > 0;
+});
+const importConfirmBtn = computed(() => {
+  return {
+    content: '确认导入',
+    loading: importConfirmLoading.value,
+    disabled: !canConfirmImport.value || importConfirmLoading.value,
+  };
+});
 
 onMounted(async () => {
   await onSearchPickingNote();
@@ -523,10 +679,155 @@ const onCancelAdd = () => {
     addFormRef.value.clearValidate();
   }
 };
+const fetchAllPickingNotes = async (currentPage = 1, collected: any[] = []): Promise<any[]> => {
+  const pageSize = 1000;
+  const res = await searchManualMarkSkuPickingNote({
+    current_page: currentPage,
+    page_size: pageSize,
+    search_sku: '',
+  });
+  const list = res.list || [];
+  const total = res.total || 0;
+  const merged = collected.concat(list);
+  if (list.length === 0 || merged.length >= total) {
+    return merged;
+  }
+  return fetchAllPickingNotes(currentPage + 1, merged);
+};
+const readFileAsArrayBuffer = (file: File) => {
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(reader.result as ArrayBuffer);
+    };
+    reader.onerror = () => {
+      reject(reader.error || new Error('读取文件失败'));
+    };
+    reader.readAsArrayBuffer(file);
+  });
+};
+const submitImportBatches = async (rows: any[], start = 0): Promise<void> => {
+  if (start >= rows.length) {
+    return;
+  }
+  const batch = rows.slice(start, start + PICKING_NOTE_IMPORT_BATCH_SIZE);
+  await submitManualMarkSkuPickingNote({
+    manual_mark_sku_list: batch.map((row) => toPickingNoteSubmitItem(row)),
+  });
+  await submitImportBatches(rows, start + PICKING_NOTE_IMPORT_BATCH_SIZE);
+};
+const onExportAll = async () => {
+  exportLoading.value = true;
+  try {
+    const [notes, userInfo] = await Promise.all([fetchAllPickingNotes(), getLoginUserInfo()]);
+    const projectId = (userInfo as any)?.project_id || '';
+    const countryName = getProjectLabel(projectId) || projectId || '未知国家';
+    exportPickingNoteExcel(notes, `${countryName}-拣货备注.xlsx`);
+    MessagePlugin.success(`已导出 ${notes.length} 条拣货备注`);
+  } catch (e) {
+    console.error(e);
+    MessagePlugin.error(`导出拣货备注失败: ${e}`);
+  } finally {
+    exportLoading.value = false;
+  }
+};
+const onChooseImportFile = () => {
+  importFileInputRef.value?.click();
+};
+const onImportPreviewTabChange = (value: string) => {
+  importPreviewTab.value = value;
+};
+const importFieldText = (row: IPickingNoteOverwriteItem, key: PickingNoteFieldKey) => {
+  const diff = getPickingNoteFieldDiff(row, key);
+  if (!diff) {
+    return '';
+  }
+  return `${diff.oldValue} → ${diff.newValue}`;
+};
+const isImportFieldChanged = (row: IPickingNoteOverwriteItem, key: PickingNoteFieldKey) => {
+  const diff = getPickingNoteFieldDiff(row, key);
+  return Boolean(diff && diff.changed);
+};
+const onImportFileChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  const file = input.files && input.files.length > 0 ? input.files[0] : null;
+  input.value = '';
+  if (!file) {
+    return;
+  }
+  if (!file.name.toLowerCase().endsWith('.xlsx')) {
+    MessagePlugin.error('请选择 xlsx 文件');
+    return;
+  }
+  importParsing.value = true;
+  try {
+    const [fileBuffer, notes] = await Promise.all([readFileAsArrayBuffer(file), fetchAllPickingNotes()]);
+    const preview = buildPickingNoteImportPreview(fileBuffer, notes);
+    importPreview.value = preview;
+    if (preview.created.length > 0) {
+      importPreviewTab.value = 'created';
+    } else if (preview.overwritten.length > 0) {
+      importPreviewTab.value = 'overwritten';
+    } else {
+      importPreviewTab.value = 'errors';
+    }
+    importDialogVisible.value = true;
+  } catch (e) {
+    console.error(e);
+    MessagePlugin.error(`解析拣货备注文件失败: ${e}`);
+  } finally {
+    importParsing.value = false;
+  }
+};
+const onConfirmImport = async () => {
+  if (!canConfirmImport.value || importConfirmLoading.value) {
+    return;
+  }
+  const rows = [...importPreview.value.created, ...importPreview.value.overwritten.map((item) => item.row)];
+  importConfirmLoading.value = true;
+  try {
+    await submitImportBatches(rows);
+    MessagePlugin.success(
+      `导入完成：新增 ${importPreview.value.created.length} 条，覆盖 ${importPreview.value.overwritten.length} 条`,
+    );
+    importDialogVisible.value = false;
+    await onSearchPickingNote();
+  } catch (e) {
+    console.error(e);
+    MessagePlugin.error(`导入拣货备注失败: ${e}`);
+    await onSearchPickingNote();
+  } finally {
+    importConfirmLoading.value = false;
+  }
+};
 const onResetSearch = async () => {
   searchSku.value = '';
   paginationCurrentPage.value = 1; // 重置到第一页
   await onSearchPickingNote();
 };
 </script>
-<style scoped></style>
+<style scoped lang="less">
+.import-file-input {
+  display: none;
+}
+
+.import-summary {
+  margin-bottom: 12px;
+  line-height: 22px;
+}
+
+.import-warning {
+  margin-bottom: 12px;
+  color: var(--td-warning-color);
+}
+
+.import-hint {
+  margin-top: 12px;
+  color: var(--td-text-color-secondary);
+}
+
+.import-field-changed {
+  color: var(--td-error-color);
+  font-weight: 600;
+}
+</style>

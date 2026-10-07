@@ -99,6 +99,7 @@ import { useRouter } from 'vue-router';
 import { useSettingStore, useUserStore } from '@/store';
 import { getActive } from '@/router';
 import { prefix } from '@/config/global';
+import { PROJECT_OPTIONS } from '@/constants/project';
 import { MenuRoute } from '@/types/interface';
 import { BackendErpStatus, getBackendErpStatus, getLoginUserInfo } from '@/apis/sysApis';
 
@@ -141,14 +142,7 @@ const selectedProject = ref('');
 const erpStatus = ref<BackendErpStatus | null>(null);
 const erpStatusLoading = ref(false);
 const erpStatusError = ref('');
-const projectOptions = [
-  { label: '菲律宾', value: 'philipine' },
-  { label: '马来西亚', value: 'malaysia' },
-  { label: '印尼-雅加达仓', value: 'indonesia' },
-  { label: '印尼-泗水仓', value: 'indonesiaWssh' },
-  { label: '泰国', value: 'thailand' },
-  { label: '巴西', value: 'brazil' },
-];
+const projectOptions = PROJECT_OPTIONS;
 
 const handleProjectChange = (value: string) => {
   const urlMap = {

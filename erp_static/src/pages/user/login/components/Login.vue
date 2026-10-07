@@ -9,7 +9,7 @@
   >
     <template v-if="type == 'password'">
       <t-form-item name="account">
-        <t-input v-model="formData.account" placeholder="请输入账号：admin" size="large">
+        <t-input v-model="formData.account" placeholder="请输入账号" size="large">
           <template #prefix-icon>
             <t-icon name="user" />
           </template>
@@ -21,7 +21,7 @@
           v-model="formData.password"
           :type="showPsw ? 'text' : 'password'"
           clearable
-          placeholder="请输入登录密码：admin"
+          placeholder="请输入登录密码"
           size="large"
         >
           <template #prefix-icon>
@@ -34,7 +34,7 @@
       </t-form-item>
 
       <div class="check-container remember-pwd">
-        <t-checkbox>记住账号</t-checkbox>
+        <t-checkbox v-model="formData.checked">记住账号</t-checkbox>
       </div>
     </template>
 
@@ -79,21 +79,22 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import QrcodeVue from 'qrcode.vue';
 import { FormInstanceFunctions, MessagePlugin } from 'tdesign-vue-next';
 import { useCounter } from '@/hooks';
 import { useUserStore } from '@/store';
+import { clearRememberedAccount, loadRememberedAccount, saveRememberedAccount } from '@/utils/aesCookie';
 
 const userStore = useUserStore();
 
 const INITIAL_DATA = {
   phone: '',
-  account: 'admin',
-  password: 'admin',
+  account: '',
+  password: '',
   verifyCode: '',
-  checked: false,
+  checked: true,
 };
 
 const FORM_RULES = {
@@ -117,6 +118,16 @@ const switchType = (val: string) => {
 
 const router = useRouter();
 
+onMounted(() => {
+  const remembered = loadRememberedAccount();
+  if (!remembered) {
+    return;
+  }
+  formData.value.account = remembered.account;
+  formData.value.password = remembered.password;
+  formData.value.checked = true;
+});
+
 /**
  * 发送验证码
  */
@@ -130,6 +141,11 @@ const sendCode = () => {
 
 const onSubmit = async ({ validateResult }) => {
   if (validateResult === true) {
+    if (formData.value.checked) {
+      saveRememberedAccount(formData.value.account, formData.value.password);
+    } else {
+      clearRememberedAccount();
+    }
     try {
       const loginForm = {
         ...formData.value,
