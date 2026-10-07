@@ -48,6 +48,52 @@ export function formatVolumeM3(volumeM3: number | null | undefined): string {
   return v.toFixed(3);
 }
 
+export function formatAvgSellQuantity(value: number | null | undefined): string {
+  const quantity = Number(value);
+  if (!Number.isFinite(quantity)) {
+    return '';
+  }
+  return quantity.toFixed(2);
+}
+
+const formatPkgQuantity = (
+  quantity: number,
+  unitQuantity: number | null | undefined,
+  unitName: string | null | undefined,
+) => {
+  if (unitQuantity === null || unitQuantity === undefined || unitQuantity <= 0) {
+    return quantity.toFixed(1);
+  }
+  const res = quantity / unitQuantity;
+  if (!unitName || !unitName.trim() || unitName.toLowerCase().includes('pcs')) {
+    return `${res.toFixed(0)}`;
+  }
+  return `${res.toFixed(1)} ${unitName.substring(0, 1)}`;
+};
+
+export const calcAvgSellQuantityPkg = (row: any) => {
+  return formatPkgQuantity(row.avg_sell_quantity, row.sku_unit_quantity, row.sku_unit_name);
+};
+
+export const calcInventoryPkg = (row: any) => {
+  return formatPkgQuantity(row.inventory, row.sku_unit_quantity, row.sku_unit_name);
+};
+
+export const calcShippingStockQuantityPkg = (row: any) => {
+  return formatPkgQuantity(row.shipping_stock_quantity, row.sku_unit_quantity, row.sku_unit_name);
+};
+
+export const calcShippingSupportDays = (row: any) => {
+  if (row.shipping_stock_quantity === 0) {
+    return '0';
+  }
+  if (row.avg_sell_quantity === 0) {
+    return '--';
+  }
+  const supportDays = row.shipping_stock_quantity / row.avg_sell_quantity;
+  return supportDays.toFixed(1);
+};
+
 // 所有sku信息
 const allSkuList = ref([]);
 // 所有skuGroup的options
@@ -78,38 +124,46 @@ export async function loadSkuInfo() {
     skuGroupMap.value = new Map<string, any[]>();
     skuMap.value = new Map<string, any[]>();
     skuInfoLoaded.value = false;
-  const req = {
-    current_page: 1,
-    page_size: 10000,
-  };
-  try {
-    const res = await searchSku(req);
-    allSkuList.value = res.list;
-    new Set(res.list.map((item) => item.sku_group)).forEach((item) => {
-      skuGroupNameOptions.value.push({
-        label: item,
-        value: item,
+    const req = {
+      current_page: 1,
+      page_size: 10000,
+    };
+    try {
+      const res = await searchSku(req);
+      allSkuList.value = res.list;
+      new Set(res.list.map((item) => item.sku_group)).forEach((item) => {
+        skuGroupNameOptions.value.push({
+          label: item,
+          value: item,
+        });
       });
-    });
-    res.list.forEach((item) => {
-      skuMap.value.set(item.sku, item);
-      const groupName = item.sku_group;
-      if (skuGroupMap.value.has(groupName)) {
-        skuGroupMap.value.get(groupName).push(item);
-      } else {
-        skuGroupMap.value.set(groupName, [item]);
-      }
-    });
-    
-    // 标记为已加载
-    skuInfoLoaded.value = true;
-  } catch (e) {
-    console.error(e);
-    await MessagePlugin.error(`查询sku异常: ${e}`);
-  } finally {
-    loadingPromise = null;
-  }
+      res.list.forEach((item) => {
+        skuMap.value.set(item.sku, item);
+        const groupName = item.sku_group;
+        if (skuGroupMap.value.has(groupName)) {
+          skuGroupMap.value.get(groupName).push(item);
+        } else {
+          skuGroupMap.value.set(groupName, [item]);
+        }
+      });
+
+      // 标记为已加载
+      skuInfoLoaded.value = true;
+    } catch (e) {
+      console.error(e);
+      await MessagePlugin.error(`查询sku异常: ${e}`);
+    } finally {
+      loadingPromise = null;
+    }
   })();
 
   return loadingPromise;
+}
+
+export async function reloadSkuInfo() {
+  if (loadingPromise) {
+    await loadingPromise;
+  }
+  skuInfoLoaded.value = false;
+  return loadSkuInfo();
 }

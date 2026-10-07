@@ -250,12 +250,175 @@ def add_sku():
     })
 
 
+def _normalize_import_sku(sku):
+    if sku is not None:
+        sku = str(sku).strip()
+    if not sku:
+        return None
+    return sku
+
+
+def _sku_exists_in_erp(seller, sku: str) -> bool:
+    return seller.get_sku_id(sku) is not None
+
+
+def _apply_manual_sku_fields(item: SkuDto, sku_group: str, sku_name: str, sku_unit_name: str,
+                             sku_unit_quantity: int, sku_pack_length: int, sku_pack_width: int,
+                             sku_pack_height: int):
+    item.sku_group = sku_group
+    item.sku_name = sku_name
+    item.sku_unit_name = sku_unit_name
+    item.sku_unit_quantity = sku_unit_quantity
+    item.sku_pack_length = sku_pack_length
+    item.sku_pack_width = sku_pack_width
+    item.sku_pack_height = sku_pack_height
+
+
+def _sync_sku_erp_fields(item: SkuDto, seller) -> bool:
+    """
+    从当前国 ERP 刷新库存、ERP 信息和日销。
+    不改可编辑字段，也不改海运中数量。ERP 中没有该 SKU 时返回 False，不写库。
+    """
+    if not _sku_exists_in_erp(seller, item.sku):
+        return False
+    sku_detail = seller.query_sku_detail(item.sku)
+    inv_detail = seller.query_sku_inventory_detail(item.sku)
+    item.inventory = sku_detail.inventory_in_warehouse
+    item.erp_sku_name = sku_detail.title
+    item.erp_sku_image_url = sku_detail.image_url
+    item.erp_sku_id = sku_detail.erp_sku_id
+    item.avg_sell_quantity = round(inv_detail.avg_daily_sales * 1.1, 2)
+    if item.avg_sell_quantity > 0.01:
+        item.inventory_support_days = int(item.inventory / item.avg_sell_quantity)
+    else:
+        item.inventory_support_days = item.inventory / 0.01
+    return True
+
+
+def _read_manual_sku_fields():
+    sku = _normalize_import_sku(request_util.get_str_param("sku"))
+    if sku is None:
+        return None, response_util.pack_error_response(1003, "商品SKU不能为空")
+    sku_group = request_util.get_str_param("sku_group")
+    sku_group = sku_group.strip() if sku_group is not None else ""
+    sku_name = request_util.get_str_param("sku_name")
+    sku_name = sku_name.strip() if sku_name is not None else ""
+    sku_unit_name = request_util.get_str_param("sku_unit_name")
+    sku_unit_name = sku_unit_name.strip() if sku_unit_name is not None else ""
+    sku_unit_quantity = request_util.get_int_param("sku_unit_quantity")
+    sku_pack_length = request_util.get_int_param("sku_pack_length", 0)
+    sku_pack_width = request_util.get_int_param("sku_pack_width", 0)
+    sku_pack_height = request_util.get_int_param("sku_pack_height", 0)
+    if not sku_group:
+        return None, response_util.pack_error_response(1003, "sku分组不能为空")
+    if not sku_name:
+        return None, response_util.pack_error_response(1003, "商品名不能为空")
+    if not sku_unit_name:
+        return None, response_util.pack_error_response(1003, "采购单位不能为空")
+    if sku_unit_quantity is None or sku_unit_quantity <= 0:
+        return None, response_util.pack_error_response(1003, "单位的SKU数必须是正整数")
+    if sku_pack_length < 0 or sku_pack_width < 0 or sku_pack_height < 0:
+        return None, response_util.pack_error_response(1003, "打包尺寸不能小于0")
+    return {
+        "sku": sku,
+        "sku_group": sku_group,
+        "sku_name": sku_name,
+        "sku_unit_name": sku_unit_name,
+        "sku_unit_quantity": sku_unit_quantity,
+        "sku_pack_length": sku_pack_length,
+        "sku_pack_width": sku_pack_width,
+        "sku_pack_height": sku_pack_height,
+    }, None
+
+
+@supplier_apis.route('/check_sku_in_erp', methods=["POST"])
+@api_post_request()
+def check_sku_in_erp():
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
+    sku = _normalize_import_sku(request_util.get_str_param("sku"))
+    if sku is None:
+        return response_util.pack_error_response(1003, "商品SKU不能为空")
+    seller = build_seller_client()
+    if not _sku_exists_in_erp(seller, sku):
+        return response_util.pack_error_response(1003, f"sku {sku} 不存在")
+    return response_util.pack_response({
+        "sku": sku,
+        "exists": True,
+    })
+
+
+@supplier_apis.route('/import_sku_manual_fields', methods=["POST"])
+@api_post_request()
+def import_sku_manual_fields():
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
+    fields, error = _read_manual_sku_fields()
+    if error is not None:
+        return error
+    backend = request_context.get_backend()
+    existing = backend.get_sku(fields["sku"])
+    active = existing is not None and existing.is_delete != 1
+    if not active:
+        seller = build_seller_client()
+        if not _sku_exists_in_erp(seller, fields["sku"]):
+            return response_util.pack_error_response(1003, f"sku {fields['sku']} 不存在")
+    if existing is None:
+        item = SkuDto(
+            project_id=request_context.get_current_project_id(),
+            sku=fields["sku"],
+            inventory=0,
+            erp_sku_name="",
+            erp_sku_image_url="",
+            erp_sku_id="",
+            erp_sku_info={},
+            avg_sell_quantity=0,
+            inventory_support_days=0,
+            shipping_stock_quantity=0,
+            is_delete=0,
+        )
+    else:
+        item = existing
+        if item.is_delete == 1:
+            item.is_delete = 0
+    _apply_manual_sku_fields(
+        item,
+        fields["sku_group"],
+        fields["sku_name"],
+        fields["sku_unit_name"],
+        fields["sku_unit_quantity"],
+        fields["sku_pack_length"],
+        fields["sku_pack_width"],
+        fields["sku_pack_height"],
+    )
+    backend.store_sku(item)
+    return response_util.pack_response(DtoUtil.to_dict(item))
+
+
+@supplier_apis.route('/sync_sku', methods=["POST"])
+@api_post_request()
+def sync_sku():
+    if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
+        return response_util.pack_error_response(1008, "权限不足")
+    sku = _normalize_import_sku(request_util.get_str_param("sku"))
+    if sku is None:
+        return response_util.pack_error_response(1003, "商品SKU不能为空")
+    backend = request_context.get_backend()
+    item = backend.get_sku(sku)
+    if item is None or item.is_delete == 1:
+        return response_util.pack_error_response(1004, f"SKU不存在: {sku}")
+    seller = build_seller_client()
+    if not _sync_sku_erp_fields(item, seller):
+        return response_util.pack_error_response(1003, f"sku {sku} 不存在")
+    backend.store_sku(item)
+    return response_util.pack_response(DtoUtil.to_dict(item))
+
+
 @supplier_apis.route('/sync_all_sku', methods=["POST"])
 @api_post_request()
 def sync_all_sku():
     # 同步策略：仅显式更新 inventory / erp_sku_* / avg_sell_quantity /
-    # inventory_support_days / shipping_stock_quantity；
-    # sku_pack_length / sku_pack_width / sku_pack_height 等手工维护字段保留旧值。
+    # inventory_support_days；sku 分组、商品名、采购单位、打包尺寸、海运中数量保留旧值。
     if not request_context.validate_user_permission(request_context.PMS_SUPPLIER):
         return response_util.pack_error_response(1008, "权限不足")
     backend = request_context.get_backend()
@@ -264,23 +427,10 @@ def sync_all_sku():
     update_count = 0
     fail_count = 0
     for item in sku_list:
-        if seller.get_sku_id(item.sku) is None:
+        if not _sync_sku_erp_fields(item, seller):
             print(f"cannot found sku {item.sku} in sku manager.")
             fail_count += 1
             continue
-        sku_detail = seller.query_sku_detail(item.sku)
-        inv_detail = seller.query_sku_inventory_detail(item.sku)
-        item.inventory = sku_detail.inventory_in_warehouse
-        item.erp_sku_name = sku_detail.title
-        item.erp_sku_image_url = sku_detail.image_url
-        item.erp_sku_id = sku_detail.erp_sku_id
-        # 计算平均销售sku数量
-        item.avg_sell_quantity = round(inv_detail.avg_daily_sales * 1.1, 2)
-        # 计算库存支撑天数
-        if item.avg_sell_quantity > 0.01:
-            item.inventory_support_days = int(item.inventory / item.avg_sell_quantity)
-        else:
-            item.inventory_support_days = item.inventory / 0.01
         backend.store_sku(item)
         update_count += 1
         time.sleep(0.3)

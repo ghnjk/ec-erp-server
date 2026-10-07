@@ -23,6 +23,18 @@ const apiList = [
     method: 'post',
   },
   {
+    url: '/erp_api/supplier/check_sku_in_erp',
+    method: 'post',
+  },
+  {
+    url: '/erp_api/supplier/import_sku_manual_fields',
+    method: 'post',
+  },
+  {
+    url: '/erp_api/supplier/sync_sku',
+    method: 'post',
+  },
+  {
     url: '/erp_api/supplier/search_sku_purchase_price',
     method: 'post',
   },

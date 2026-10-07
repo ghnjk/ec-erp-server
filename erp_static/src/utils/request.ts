@@ -1,4 +1,10 @@
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
+
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    silent?: boolean;
+  }
+}
 import { MessagePlugin } from 'tdesign-vue-next';
 import proxy from '../config/proxy';
 
@@ -66,17 +72,20 @@ instance.interceptors.response.use(
         return data.data;
       }
 
-      MessagePlugin.error(`接口请求报错: ${data.resultMsg}`);
+      if (!(response.config as AxiosRequestConfig).silent) {
+        MessagePlugin.error(`接口请求报错: ${data.resultMsg}`);
+      }
       return Promise.reject(data);
     }
     return Promise.reject(response);
   },
   (error) => {
-    if (error.response?.status >= 500) {
-      MessagePlugin.error('服务器异常');
-    } else if (error.response?.status === 401 || error.response?.status === 403) {
+    const silent = Boolean((error.config as AxiosRequestConfig | undefined)?.silent);
+    if (error.response?.status === 401 || error.response?.status === 403) {
       MessagePlugin.warning(`接口权限过期, 请刷新浏览器重新登录`);
-    } else {
+    } else if (!silent && error.response?.status >= 500) {
+      MessagePlugin.error('服务器异常');
+    } else if (!silent) {
       MessagePlugin.closeAll();
       MessagePlugin.error(`接口请求异常: ${error.message}`);
     }

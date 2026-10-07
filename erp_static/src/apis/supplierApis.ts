@@ -45,6 +45,37 @@ export const deleteSku = (req: IDeleteSkuReq) => {
 export const syncAllSku = () => {
   return request.post<any, any>('/erp_api/supplier/sync_all_sku', {});
 };
+
+/* eslint-disable camelcase */
+export interface ISkuManualFieldsReq {
+  sku: string;
+  sku_group: string;
+  sku_name: string;
+  sku_unit_name: string;
+  sku_unit_quantity: number;
+  sku_pack_length: number;
+  sku_pack_width: number;
+  sku_pack_height: number;
+}
+/* eslint-enable camelcase */
+
+export const checkSkuInErp = (req: { sku: string }) => {
+  return request.post<{ sku: string }, { sku: string; exists: boolean }>('/erp_api/supplier/check_sku_in_erp', req, {
+    silent: true,
+  });
+};
+
+export const importSkuManualFields = (req: ISkuManualFieldsReq) => {
+  return request.post<ISkuManualFieldsReq, Record<string, unknown>>('/erp_api/supplier/import_sku_manual_fields', req, {
+    silent: true,
+  });
+};
+
+export const syncSku = (req: { sku: string }) => {
+  return request.post<{ sku: string }, Record<string, unknown>>('/erp_api/supplier/sync_sku', req, {
+    silent: true,
+  });
+};
 /**
  * 检索商品SKU采购价
  * @param req

@@ -34,6 +34,17 @@
                 <t-button theme="default" variant="outline" @click="popupColumnSettingDialog">列设置</t-button>
               </t-space>
               <t-space size="small" style="align-items: center; margin-left: 30px">
+                <t-button theme="default" :loading="exportLoading" @click="onExportSku">导出</t-button>
+                <t-button theme="default" :loading="importParsing" @click="onChooseImportFile">导入</t-button>
+                <input
+                  ref="importFileInputRef"
+                  class="import-file-input"
+                  type="file"
+                  accept=".xlsx"
+                  @change="onImportFileChange"
+                />
+              </t-space>
+              <t-space size="small" style="align-items: center; margin-left: 30px">
                 <t-button theme="default" variant="text" @click="onSyncAllSku">同步所有库存</t-button>
               </t-space>
             </t-form-item>
@@ -183,6 +194,132 @@
         <t-input v-model="deleteSkuDialog.confirmSku" placeholder="请输入完整SKU" />
       </div>
     </t-dialog>
+    <t-dialog
+      v-model:visible="importDialogVisible"
+      header="导入商品SKU预览"
+      :cancel-btn="null"
+      :close-btn="importPhase !== 'running'"
+      :close-on-esc-keydown="false"
+      :close-on-overlay-click="false"
+      :confirm-btn="null"
+      show-overlay
+      width="92%"
+    >
+      <div class="import-summary">{{ importCountryHint }}</div>
+      <div class="import-summary">
+        本次导入：新增 {{ importPreview.created.length }} 条，覆盖 {{ importPreview.overwritten.length }} 条，无变化
+        {{ importPreview.unchangedCount }} 条。
+      </div>
+      <div v-if="importPreview.errors.length" class="import-warning">
+        有 {{ importPreview.errors.length }} 行校验失败，确认导入后将跳过这些行。
+      </div>
+      <div v-if="importPhase !== 'idle'" class="import-summary">
+        已处理 {{ importFinishedCount }} / {{ importActionCount }}
+      </div>
+      <t-tabs :value="importPreviewTab" @change="onImportPreviewTabChange">
+        <t-tab-panel value="created" :label="`新增 (${importPreview.created.length})`">
+          <t-table
+            :columns="importCreatedColumns"
+            :data="importPreview.created"
+            row-key="rowIndex"
+            bordered
+            hover
+            size="small"
+            max-height="420"
+          >
+            <template #import_status="{ row }">
+              <span :class="importStatusClass(row.importStatus)">{{ importStatusLabel(row) }}</span>
+            </template>
+            <template #sync_status="{ row }">
+              <span :class="importStatusClass(row.syncStatus)">{{ syncStatusLabel(row) }}</span>
+            </template>
+          </t-table>
+        </t-tab-panel>
+        <t-tab-panel value="overwritten" :label="`覆盖 (${importPreview.overwritten.length})`">
+          <t-table
+            :columns="importOverwriteColumns"
+            :data="importPreview.overwritten"
+            row-key="rowIndex"
+            bordered
+            hover
+            size="small"
+            max-height="420"
+          >
+            <template #sku_group="{ row }">
+              <span :class="{ 'import-field-changed': isImportFieldChanged(row, 'sku_group') }">
+                {{ importFieldText(row, 'sku_group') }}
+              </span>
+            </template>
+            <template #sku_name="{ row }">
+              <span :class="{ 'import-field-changed': isImportFieldChanged(row, 'sku_name') }">
+                {{ importFieldText(row, 'sku_name') }}
+              </span>
+            </template>
+            <template #sku_unit_name="{ row }">
+              <span :class="{ 'import-field-changed': isImportFieldChanged(row, 'sku_unit_name') }">
+                {{ importFieldText(row, 'sku_unit_name') }}
+              </span>
+            </template>
+            <template #sku_unit_quantity="{ row }">
+              <span :class="{ 'import-field-changed': isImportFieldChanged(row, 'sku_unit_quantity') }">
+                {{ importFieldText(row, 'sku_unit_quantity') }}
+              </span>
+            </template>
+            <template #sku_pack_length="{ row }">
+              <span :class="{ 'import-field-changed': isImportFieldChanged(row, 'sku_pack_length') }">
+                {{ importFieldText(row, 'sku_pack_length') }}
+              </span>
+            </template>
+            <template #sku_pack_width="{ row }">
+              <span :class="{ 'import-field-changed': isImportFieldChanged(row, 'sku_pack_width') }">
+                {{ importFieldText(row, 'sku_pack_width') }}
+              </span>
+            </template>
+            <template #sku_pack_height="{ row }">
+              <span :class="{ 'import-field-changed': isImportFieldChanged(row, 'sku_pack_height') }">
+                {{ importFieldText(row, 'sku_pack_height') }}
+              </span>
+            </template>
+            <template #import_status="{ row }">
+              <span :class="importStatusClass(row.importStatus)">{{ importStatusLabel(row) }}</span>
+            </template>
+            <template #sync_status="{ row }">
+              <span :class="importStatusClass(row.syncStatus)">{{ syncStatusLabel(row) }}</span>
+            </template>
+          </t-table>
+        </t-tab-panel>
+        <t-tab-panel value="errors" :label="`校验失败 (${importPreview.errors.length})`">
+          <t-table
+            :columns="importErrorColumns"
+            :data="importPreview.errors"
+            row-key="rowIndex"
+            bordered
+            hover
+            size="small"
+            max-height="420"
+          />
+        </t-tab-panel>
+      </t-tabs>
+      <div class="import-hint">确认后才会写入当前国家。新增 SKU 若当前国 ERP 没有该编码，会标同步失败且不入库。</div>
+      <t-row class="import-actions">
+        <t-col :span="8"></t-col>
+        <t-col :span="4">
+          <t-space style="float: right">
+            <t-button v-if="importPhase === 'idle'" theme="default" @click="importDialogVisible = false">取消</t-button>
+            <t-button
+              v-if="importPhase === 'idle'"
+              theme="primary"
+              :disabled="!canConfirmImport"
+              @click="onConfirmImport"
+            >
+              确认导入
+            </t-button>
+            <t-button v-if="importPhase === 'running'" theme="primary" loading>导入中</t-button>
+            <t-button v-if="importPhase === 'done'" theme="primary" @click="importDialogVisible = false">关闭</t-button>
+          </t-space>
+        </t-col>
+      </t-row>
+    </t-dialog>
   </div>
 </template>
 
@@ -194,8 +331,44 @@ export default {
 <script lang="ts" setup>
 import { ref, computed, onMounted } from 'vue';
 import { MessagePlugin, InputNumber, Input, TableProps } from 'tdesign-vue-next';
-import { saveSku, searchSku, syncAllSku, addSku, deleteSku } from '@/apis/supplierApis';
-import { skuGroupNameOptions, loadSkuInfo, calcPackVolumeM3PerUnit, formatVolumeM3 } from '@/utils/skuUtil';
+import {
+  saveSku,
+  searchSku,
+  syncAllSku,
+  addSku,
+  deleteSku,
+  checkSkuInErp,
+  importSkuManualFields,
+  syncSku,
+} from '@/apis/supplierApis';
+import { getLoginUserInfo } from '@/apis/sysApis';
+import { getProjectLabel } from '@/constants/project';
+import {
+  skuGroupNameOptions,
+  loadSkuInfo,
+  reloadSkuInfo,
+  calcPackVolumeM3PerUnit,
+  formatVolumeM3,
+  calcAvgSellQuantityPkg,
+  calcInventoryPkg,
+  calcShippingStockQuantityPkg,
+  calcShippingSupportDays,
+} from '@/utils/skuUtil';
+import {
+  SKU_IMPORT_INTERVAL_MS,
+  buildSkuImportPreview,
+  exportSkuExcel,
+  getSkuImportFieldDiff,
+  parseSkuExcelSourceCountry,
+  skuImportStatusText,
+  toSkuManualFieldsPayload,
+} from '@/utils/skuExcel';
+import type {
+  ISkuImportPreview,
+  ISkuImportOverwriteItem,
+  SkuImportOpStatus,
+  SkuManualFieldKey,
+} from '@/utils/skuExcel';
 
 // 列设置 localStorage key（v2：新增必显「操作」列）
 const COL_VISIBILITY_STORAGE_KEY = 'sku_list_visible_cols_v2';
@@ -459,46 +632,6 @@ const onPaginationChange = ({ current, pageSize }: { current: number; pageSize: 
   paginationPageSize.value = pageSize;
   onSearchSku();
 };
-const calcAvgSellQuantityPkg = (row: any) => {
-  if (row.sku_unit_quantity === null || row.sku_unit_quantity === undefined || row.sku_unit_quantity <= 0) {
-    return row.avg_sell_quantity.toFixed(1);
-  }
-  const res = row.avg_sell_quantity / row.sku_unit_quantity;
-  if (!row.sku_unit_name || !row.sku_unit_name.trim() || row.sku_unit_name.toLowerCase().includes('pcs')) {
-    return `${res.toFixed(0)}`;
-  }
-  return `${res.toFixed(1)} ${row.sku_unit_name.substring(0, 1)}`;
-};
-const calcInventoryPkg = (row: any) => {
-  if (row.sku_unit_quantity === null || row.sku_unit_quantity === undefined || row.sku_unit_quantity <= 0) {
-    return row.inventory.toFixed(1);
-  }
-  const res = row.inventory / row.sku_unit_quantity;
-  if (!row.sku_unit_name || !row.sku_unit_name.trim() || row.sku_unit_name.toLowerCase().includes('pcs')) {
-    return `${res.toFixed(0)}`;
-  }
-  return `${res.toFixed(1)} ${row.sku_unit_name.substring(0, 1)}`;
-};
-const calcShippingStockQuantityPkg = (row: any) => {
-  if (row.sku_unit_quantity === null || row.sku_unit_quantity === undefined || row.sku_unit_quantity <= 0) {
-    return row.shipping_stock_quantity.toFixed(1);
-  }
-  const res = row.shipping_stock_quantity / row.sku_unit_quantity;
-  if (!row.sku_unit_name || !row.sku_unit_name.trim() || row.sku_unit_name.toLowerCase().includes('pcs')) {
-    return `${res.toFixed(0)}`;
-  }
-  return `${res.toFixed(1)} ${row.sku_unit_name.substring(0, 1)}`;
-};
-const calcShippingSupportDays = (row: any) => {
-  if (row.shipping_stock_quantity === 0) {
-    return '0';
-  }
-  if (row.avg_sell_quantity === 0) {
-    return '--';
-  }
-  const supportDays = row.shipping_stock_quantity / row.avg_sell_quantity;
-  return supportDays.toFixed(1);
-};
 const onSaveSku = async (sku: any) => {
   try {
     await saveSku(sku);
@@ -584,6 +717,262 @@ const onSearchSku = async () => {
   }
   skuTableLoading.value = false;
 };
+
+const exportLoading = ref(false);
+const importParsing = ref(false);
+const importDialogVisible = ref(false);
+const importPhase = ref<'idle' | 'running' | 'done'>('idle');
+const importPreviewTab = ref('created');
+const importSourceCountry = ref('');
+const currentCountryName = ref('');
+const importFileInputRef = ref<HTMLInputElement | null>(null);
+const emptyImportPreview = (): ISkuImportPreview => ({
+  created: [],
+  overwritten: [],
+  unchangedCount: 0,
+  errors: [],
+});
+const importPreview = ref<ISkuImportPreview>(emptyImportPreview());
+const importCreatedColumns = [
+  { colKey: 'rowIndex', title: '行号', width: 70 },
+  { colKey: 'sku', title: '商品SKU', width: 160 },
+  { colKey: 'sku_group', title: 'sku分组', width: 120 },
+  { colKey: 'sku_name', title: '商品名', width: 140 },
+  { colKey: 'sku_unit_name', title: '采购单位', width: 100 },
+  { colKey: 'sku_unit_quantity', title: '单位的SKU数', width: 120 },
+  { colKey: 'sku_pack_length', title: '打包长(cm)', width: 110 },
+  { colKey: 'sku_pack_width', title: '打包宽(cm)', width: 110 },
+  { colKey: 'sku_pack_height', title: '打包高(cm)', width: 110 },
+  { colKey: 'import_status', title: '导入状态', width: 160 },
+  { colKey: 'sync_status', title: '同步状态', width: 180 },
+];
+const importOverwriteColumns = [
+  { colKey: 'rowIndex', title: '行号', width: 70 },
+  { colKey: 'sku', title: '商品SKU', width: 160 },
+  { colKey: 'sku_group', title: 'sku分组', width: 160 },
+  { colKey: 'sku_name', title: '商品名', width: 160 },
+  { colKey: 'sku_unit_name', title: '采购单位', width: 140 },
+  { colKey: 'sku_unit_quantity', title: '单位的SKU数', width: 140 },
+  { colKey: 'sku_pack_length', title: '打包长(cm)', width: 130 },
+  { colKey: 'sku_pack_width', title: '打包宽(cm)', width: 130 },
+  { colKey: 'sku_pack_height', title: '打包高(cm)', width: 130 },
+  { colKey: 'import_status', title: '导入状态', width: 160 },
+  { colKey: 'sync_status', title: '同步状态', width: 180 },
+];
+const importErrorColumns = [
+  { colKey: 'rowIndex', title: '行号', width: 80 },
+  { colKey: 'sku', title: '商品SKU', width: 180 },
+  { colKey: 'message', title: '原因' },
+];
+const canConfirmImport = computed(
+  () => importPreview.value.created.length + importPreview.value.overwritten.length > 0,
+);
+const importActionCount = computed(() => importPreview.value.created.length + importPreview.value.overwritten.length);
+const isImportRowSettled = (row: { importStatus: SkuImportOpStatus; syncStatus: SkuImportOpStatus }) => {
+  const importDone = row.importStatus === 'success' || row.importStatus === 'fail' || row.importStatus === 'skipped';
+  const syncDone = row.syncStatus === 'success' || row.syncStatus === 'fail' || row.syncStatus === 'skipped';
+  return importDone && syncDone;
+};
+const importFinishedCount = computed(() => {
+  const rows = [...importPreview.value.created, ...importPreview.value.overwritten];
+  return rows.filter((row) => isImportRowSettled(row)).length;
+});
+const importCountryHint = computed(() => {
+  const current = currentCountryName.value || '当前国家';
+  const source = importSourceCountry.value;
+  if (source && source !== current) {
+    return `文件来自 ${source}，将写入 ${current}`;
+  }
+  return `将写入 ${current}`;
+});
+const fetchAllSkus = async (currentPage = 1, collected: any[] = []): Promise<any[]> => {
+  const pageSize = 1000;
+  const res = await searchSku({
+    current_page: currentPage,
+    page_size: pageSize,
+  });
+  const list = res.list || [];
+  const total = res.total || 0;
+  const merged = collected.concat(list);
+  if (list.length === 0 || merged.length >= total) {
+    return merged;
+  }
+  return fetchAllSkus(currentPage + 1, merged);
+};
+const readFileAsArrayBuffer = (file: File) => {
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(reader.result as ArrayBuffer);
+    };
+    reader.onerror = () => {
+      reject(reader.error || new Error('读取文件失败'));
+    };
+    reader.readAsArrayBuffer(file);
+  });
+};
+const resolveCountryName = async () => {
+  const userInfo = await getLoginUserInfo();
+  const projectId = (userInfo as any)?.project_id || '';
+  return getProjectLabel(projectId) || projectId || '未知国家';
+};
+const apiErrorMessage = (error: unknown) => {
+  if (error && typeof error === 'object' && 'resultMsg' in error) {
+    const message = String((error as { resultMsg?: string }).resultMsg || '').trim();
+    if (message) {
+      return message;
+    }
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return '请求失败';
+};
+const sleep = (ms: number) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+const importStatusClass = (status: SkuImportOpStatus) => {
+  if (status === 'success') return 'import-status-success';
+  if (status === 'fail') return 'import-status-fail';
+  if (status === 'skipped') return 'import-status-skipped';
+  return '';
+};
+const importStatusLabel = (row: { importStatus: SkuImportOpStatus; importMessage: string }) => {
+  if (row.importStatus === 'pending') return '待导入';
+  if (row.importStatus === 'running') return '导入中';
+  return skuImportStatusText(row.importStatus, row.importMessage, '导入成功', '导入失败');
+};
+const syncStatusLabel = (row: { syncStatus: SkuImportOpStatus; syncMessage: string }) => {
+  if (row.syncStatus === 'pending') return '待同步';
+  if (row.syncStatus === 'running') return '同步中';
+  return skuImportStatusText(row.syncStatus, row.syncMessage, '同步成功', '同步失败');
+};
+const onImportPreviewTabChange = (value: string) => {
+  importPreviewTab.value = value;
+};
+const importFieldText = (row: ISkuImportOverwriteItem, key: SkuManualFieldKey) => {
+  const diff = getSkuImportFieldDiff(row, key);
+  if (!diff) return '';
+  return `${diff.oldValue} → ${diff.newValue}`;
+};
+const isImportFieldChanged = (row: ISkuImportOverwriteItem, key: SkuManualFieldKey) => {
+  const diff = getSkuImportFieldDiff(row, key);
+  return Boolean(diff && diff.changed);
+};
+const onExportSku = async () => {
+  exportLoading.value = true;
+  try {
+    const [skus, countryName] = await Promise.all([fetchAllSkus(), resolveCountryName()]);
+    exportSkuExcel(skus, `${countryName}_商品sku.xlsx`);
+    MessagePlugin.success(`已导出 ${skus.length} 条商品SKU`);
+  } catch (e) {
+    console.error(e);
+    MessagePlugin.error(`导出商品SKU失败: ${e}`);
+  } finally {
+    exportLoading.value = false;
+  }
+};
+const onChooseImportFile = () => {
+  importFileInputRef.value?.click();
+};
+const onImportFileChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  const file = input.files && input.files.length > 0 ? input.files[0] : null;
+  input.value = '';
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith('.xlsx')) {
+    MessagePlugin.error('请选择 xlsx 文件');
+    return;
+  }
+  importParsing.value = true;
+  try {
+    const [fileBuffer, skus, countryName] = await Promise.all([
+      readFileAsArrayBuffer(file),
+      fetchAllSkus(),
+      resolveCountryName(),
+    ]);
+    currentCountryName.value = countryName;
+    importSourceCountry.value = parseSkuExcelSourceCountry(file.name);
+    importPreview.value = buildSkuImportPreview(fileBuffer, skus);
+    importPhase.value = 'idle';
+    if (importPreview.value.created.length > 0) {
+      importPreviewTab.value = 'created';
+    } else if (importPreview.value.overwritten.length > 0) {
+      importPreviewTab.value = 'overwritten';
+    } else {
+      importPreviewTab.value = 'errors';
+    }
+    importDialogVisible.value = true;
+  } catch (e) {
+    console.error(e);
+    MessagePlugin.error(`解析商品SKU文件失败: ${e}`);
+  } finally {
+    importParsing.value = false;
+  }
+};
+const onConfirmImport = async () => {
+  if (!canConfirmImport.value || importPhase.value !== 'idle') return;
+  const actions = [
+    ...importPreview.value.created.map((item) => ({ kind: 'created' as const, item })),
+    ...importPreview.value.overwritten.map((item) => ({ kind: 'overwrite' as const, item })),
+  ].sort((left, right) => left.item.rowIndex - right.item.rowIndex);
+  importPhase.value = 'running';
+  const importOne = async (action: (typeof actions)[number]) => {
+    const fields = action.kind === 'created' ? action.item : action.item.row;
+    if (action.kind === 'created') {
+      action.item.syncStatus = 'running';
+      try {
+        await checkSkuInErp({ sku: fields.sku });
+        action.item.syncStatus = 'pending';
+        action.item.syncMessage = '';
+      } catch (error) {
+        action.item.syncStatus = 'fail';
+        action.item.syncMessage = apiErrorMessage(error);
+        action.item.importStatus = 'skipped';
+        action.item.importMessage = '未导入';
+        return;
+      }
+    }
+    action.item.importStatus = 'running';
+    try {
+      await importSkuManualFields(toSkuManualFieldsPayload(fields));
+      action.item.importStatus = 'success';
+      action.item.importMessage = '';
+    } catch (error) {
+      action.item.importStatus = 'fail';
+      action.item.importMessage = apiErrorMessage(error);
+      action.item.syncStatus = 'skipped';
+      action.item.syncMessage = '未同步';
+      return;
+    }
+    action.item.syncStatus = 'running';
+    try {
+      await syncSku({ sku: fields.sku });
+      action.item.syncStatus = 'success';
+      action.item.syncMessage = '';
+    } catch (error) {
+      action.item.syncStatus = 'fail';
+      action.item.syncMessage = apiErrorMessage(error);
+    }
+  };
+  try {
+    for (let index = 0; index < actions.length; index += 1) {
+      if (index > 0) {
+        // 串行间隔，避免连续打 ERP
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(SKU_IMPORT_INTERVAL_MS);
+      }
+      // 必须逐条执行，才能在对话框里实时标出导入和同步结果
+      // eslint-disable-next-line no-await-in-loop
+      await importOne(actions[index]);
+    }
+    await onSearchSku();
+    await reloadSkuInfo();
+  } finally {
+    importPhase.value = 'done';
+  }
+};
 </script>
 
 <style lang="less" scoped>
@@ -623,5 +1012,45 @@ const onSearchSku = async () => {
     background: var(--td-error-color-1);
     border-radius: 3px;
   }
+}
+
+.import-file-input {
+  display: none;
+}
+
+.import-summary {
+  margin-bottom: 12px;
+  line-height: 22px;
+}
+
+.import-warning {
+  margin-bottom: 12px;
+  color: var(--td-warning-color);
+}
+
+.import-hint {
+  margin-top: 12px;
+  color: var(--td-text-color-secondary);
+}
+
+.import-actions {
+  margin-top: 16px;
+}
+
+.import-field-changed {
+  color: var(--td-error-color);
+  font-weight: 600;
+}
+
+.import-status-success {
+  color: var(--td-success-color);
+}
+
+.import-status-fail {
+  color: var(--td-error-color);
+}
+
+.import-status-skipped {
+  color: var(--td-warning-color);
 }
 </style>

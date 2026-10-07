@@ -72,6 +72,9 @@
 | [保存SKU](./supplier/save_sku.md) | `/erp_api/supplier/save_sku` | 保存或更新SKU信息 |
 | [批量添加SKU](./supplier/add_sku.md) | `/erp_api/supplier/add_sku` | 批量添加SKU，自动同步BigSeller数据 |
 | [删除SKU](./supplier/delete_sku.md) | `/erp_api/supplier/delete_sku` | 按SKU逻辑删除商品主数据 |
+| [检查SKU是否在ERP](./supplier/check_sku_in_erp.md) | `/erp_api/supplier/check_sku_in_erp` | 查询当前国 ERP 是否有该 SKU，不写数据库 |
+| [导入SKU可编辑字段](./supplier/import_sku_manual_fields.md) | `/erp_api/supplier/import_sku_manual_fields` | 只写入可编辑字段；ERP 没有的新 SKU 不插入 |
+| [同步单个SKU](./supplier/sync_sku.md) | `/erp_api/supplier/sync_sku` | 从当前国 ERP 同步单个已存在 SKU |
 | [同步所有SKU](./supplier/sync_all_sku.md) | `/erp_api/supplier/sync_all_sku` | 同步所有SKU的库存和销量信息 |
 
 #### 采购价格管理
